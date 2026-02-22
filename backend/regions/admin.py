@@ -9,6 +9,6 @@ from regions.models import Region
 class RegionAdmin(admin.GISModelAdmin):
     """Admin interface for Region with map widget support."""
 
-    list_display = ("name", "created_at", "updated_at")
-    search_fields = ("name",)
+    list_display = ("name", "code", "created_at", "updated_at")
+    search_fields = ("name", "code")
     readonly_fields = ("created_at", "updated_at")

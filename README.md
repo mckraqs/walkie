@@ -69,35 +69,15 @@ docker compose down
 
 ## Configuration
 
-### Environment Variables
+See [docs/configuration.md](docs/configuration.md) for environment variables,
+GDAL/GEOS paths, CORS settings, and PostGIS image details.
 
-Copy `.env.example` to `.env` and adjust as needed. The backend falls back to
-development defaults (`walkie`/`walkie`/`walkie`) when variables are unset.
+## Documentation
 
-| Variable            | Description              | Default     |
-| ------------------- | ------------------------ | ----------- |
-| `POSTGRES_DB`       | Database name            | `walkie`    |
-| `POSTGRES_USER`     | Database user            | `walkie`    |
-| `POSTGRES_PASSWORD` | Database password        | `walkie`    |
-| `POSTGRES_HOST`     | Database host            | `localhost` |
-| `POSTGRES_PORT`     | Database port            | `5432`      |
+Additional documentation lives in the [`docs/`](docs/) directory:
 
-### GDAL / GEOS Library Paths
-
-GeoDjango requires GDAL and GEOS native libraries. On macOS with Homebrew the defaults
-point to `/opt/homebrew/lib/`. Override via environment variables if your paths differ:
-
-```bash
-export GDAL_LIBRARY_PATH="/opt/homebrew/lib/libgdal.dylib"
-export GEOS_LIBRARY_PATH="/opt/homebrew/lib/libgeos_c.dylib"
-```
-
-### CORS
-
-The backend allows requests from `http://localhost:3000` (the Next.js dev server).
-This is configured in `backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
-
-### PostGIS Docker Image
-
-The project uses `imresamu/postgis:17-3.5`, which provides multi-architecture builds
-(AMD64 and ARM64). No platform flag is needed on Apple Silicon Macs.
+- [Configuration](docs/configuration.md) -- environment variables, library paths, CORS,
+  Docker image
+- [Data Pipeline](docs/data-pipeline.md) -- geoportal processing script, CLI arguments,
+  output schemas, management commands
+- [Models](docs/models.md) -- Django models (`Region`, `Path`), fields, relationships

@@ -10,9 +10,14 @@ dependencies = [
     "djangorestframework>=3.16.1",
     "djangorestframework-gis>=1.2.0",
     "geopandas>=1.0.1",
+    "psycopg[binary]>=3.3.3",
+]
+
+[dependency-groups]
+dev = [
     "ipykernel>=7.2.0",
     "pre-commit>=4.3.0",
-    "psycopg[binary]>=3.3.3",
+    "pyright>=1.1.400",
     "pytest>=9.0.2",
     "pytest-django>=4.12.0",
     "ruff>=0.15.2",
@@ -24,6 +29,8 @@ log_cli = true
 log_cli_level = "INFO"
 DJANGO_SETTINGS_MODULE = "walkie.settings"
 pythonpath = ["backend"]
+testpaths = ["backend", "data"]
+python_files = ["test_*.py", "tests.py"]
 
 [tool.pyright]
 pythonVersion = "3.14"

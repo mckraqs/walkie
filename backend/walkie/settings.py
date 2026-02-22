@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,11 +29,14 @@ GEOS_LIBRARY_PATH = os.environ.get(
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-dwxjoc_&q$ob$$bm@__jec)9m4m@#j@io(*x^wcvmkf4j$5vgi"
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        msg = "SECRET_KEY environment variable is required when DEBUG=False"
+        raise ImproperlyConfigured(msg)
+    SECRET_KEY = "django-insecure-local-development-only"
 
 ALLOWED_HOSTS: list[str] = []
 

@@ -1,17 +1,27 @@
 """Models for the regions app."""
 
+from typing import ClassVar
+
 from django.contrib.gis.db import models
 
 
 class Region(models.Model):
     """A geographic region defined by a boundary polygon."""
 
-    name = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=255)
     boundary = models.MultiPolygonField(srid=4326)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        """Meta options for Region."""
+
+        indexes: ClassVar = [
+            models.Index(fields=["code"]),
+        ]
+
     def __str__(self) -> str:
-        """Return the region name."""
-        return self.name
+        """Return the region name and code."""
+        return f"{self.name} ({self.code})"
