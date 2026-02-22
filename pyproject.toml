@@ -1,0 +1,72 @@
+[project]
+name = "global"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pre-commit>=4.3.0",
+    "ruff>=0.15.2",
+]
+
+# Below settings can be copy-pasted
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+
+[tool.pyright]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+diagnosticMode = "workspace"
+disableOrganizeImports = true # let ruff do it
+useLibraryCodeForTypes = true
+autoImportCompletions = true
+reportMissingImports = true
+reportGeneralTypeIssues = true
+reportInferoredType = true
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py314"
+exclude = ["dir1", "dir2"]
+src = ["dir1", "dir2"]
+
+[tool.ruff.lint]
+ignore = [
+	"W191",
+	"E11",
+	"E114",
+	"E117",
+	"D206",
+	"D300",
+	"W292"
+]
+select = [
+	"E",
+	"W",
+	"F",
+	"UP",
+	"C",
+	"B",
+	"SIM",
+	"I",
+	"C90",
+	"ANN",
+	"TD",
+	"ERA",
+	"RET",
+	"RUF",
+	"PT",
+	"D",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true

@@ -1,0 +1,19 @@
+# Python & Jupyter
+.DS_Store
+.idea/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff.toml
+*__pycache__/
+/*.ipynb
+
+# Other files
+.ruff_cache/
+.venv/
+*.zip
+cache/
+dist/
+misc/
+package/
+packages/
+python/
