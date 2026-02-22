@@ -143,7 +143,6 @@ class Command(BaseCommand):
                     surface=row.surface if row.surface else "",
                     accessible=bool(row.accessible),
                     is_lit=bool(row.is_lit),
-                    region_code=code,
                 )
             )
 

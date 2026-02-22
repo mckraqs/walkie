@@ -18,6 +18,7 @@ class Region(models.Model):
     class Meta:
         """Meta options for Region."""
 
+        db_table = "regions"
         indexes: ClassVar = [
             models.Index(fields=["code"]),
         ]

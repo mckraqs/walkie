@@ -16,10 +16,9 @@ class PathAdmin(admin.GISModelAdmin):
         "accessible",
         "is_lit",
         "region",
-        "region_code",
         "created_at",
     )
     list_filter = ("category", "accessible", "is_lit", "region")
-    search_fields = ("name", "region_code")
+    search_fields = ("name",)
     readonly_fields = ("created_at",)
     raw_id_fields = ("region",)

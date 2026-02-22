@@ -33,7 +33,6 @@ def sample_path(sample_region: Region) -> Path:
         surface="asphalt",
         accessible=True,
         is_lit=True,
-        region_code="0001_0001",
     )
 
 

@@ -23,16 +23,15 @@ class Path(models.Model):
     surface = models.CharField(max_length=50, blank=True)
     accessible = models.BooleanField(default=False)
     is_lit = models.BooleanField(default=False)
-    region_code = models.CharField(max_length=20, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         """Meta options for Path."""
 
+        db_table = "paths"
         indexes: ClassVar = [
             models.Index(fields=["region"]),
             models.Index(fields=["category"]),
-            models.Index(fields=["region_code"]),
         ]
 
     def __str__(self) -> str:
