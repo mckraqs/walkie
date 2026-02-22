@@ -135,6 +135,12 @@ class Command(BaseCommand):
                     code=row["region_code"],
                     name=row["name"],
                     boundary=boundary,
+                    administrative_district_lvl_1=row.get(
+                        "administrative_district_lvl_1", ""
+                    ),
+                    administrative_district_lvl_2=row.get(
+                        "administrative_district_lvl_2", ""
+                    ),
                 )
             )
 

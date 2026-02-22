@@ -1,6 +1,18 @@
-import type { RegionFeature, PathFeatureCollection } from "@/types/geo";
+import type {
+  RegionFeature,
+  RegionListItem,
+  PathFeatureCollection,
+} from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+export async function fetchRegions(): Promise<RegionListItem[]> {
+  const res = await fetch(`${API_URL}/api/regions/`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch regions: ${res.status}`);
+  }
+  return res.json();
+}
 
 export async function fetchRegion(regionId: string): Promise<RegionFeature> {
   const res = await fetch(`${API_URL}/api/regions/${regionId}/`, {

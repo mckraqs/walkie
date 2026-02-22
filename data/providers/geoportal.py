@@ -45,7 +45,70 @@ ARGUMENTS = [
         "name": "--layer_name",
         "help": "Layer name inside the input GeoPackage.",
     },
+    {
+        "name": "--voivodeships_path",
+        "help": "Path to GeoPackage with voivodeship boundaries.",
+    },
+    {
+        "name": "--districts_path",
+        "help": "Path to GeoPackage with district (powiat) boundaries.",
+    },
 ]
+
+
+def _load_admin_boundaries(
+    path: str,
+    layer: str,
+    name_col: str,
+    code_col: str,
+) -> gpd.GeoDataFrame:
+    """Load admin boundary polygons from a GeoPackage.
+
+    Reads the specified layer, reprojects from EPSG:3857 to EPSG:4326,
+    and returns a GeoDataFrame with standardised columns.
+
+    Args:
+        path: Path to the GeoPackage file.
+        layer: Layer name inside the GeoPackage.
+        name_col: Source column containing the admin area name.
+        code_col: Source column containing the admin area code.
+
+    Returns:
+        GeoDataFrame with columns [admin_name, admin_code, geometry].
+    """
+    gdf = gpd.read_file(path, layer=layer)
+    gdf = gdf.to_crs(epsg=4326)
+    gdf = gdf.rename(columns={name_col: "admin_name", code_col: "admin_code"})
+    gdf = gdf[["admin_name", "admin_code", "geometry"]]
+    logger.info("Loaded %d admin boundaries from %s (layer: %s)", len(gdf), path, layer)
+    return gdf
+
+
+def _assign_admin_district(
+    streets_gdf: gpd.GeoDataFrame,
+    admin_gdf: gpd.GeoDataFrame,
+) -> pd.Series:  # type: ignore[type-arg]
+    """Assign each region to the admin district containing the most street length.
+
+    Both inputs are reprojected to EPSG:2180 (Poland CS92) for accurate
+    length calculations in metres.
+
+    Args:
+        streets_gdf: Streets GeoDataFrame with region_code and geometry columns.
+        admin_gdf: Admin boundary GeoDataFrame with admin_name and geometry.
+
+    Returns:
+        Series mapping region_code to admin_name (winner by longest total).
+    """
+    streets = streets_gdf[streets_gdf["region_code"] != ""].copy()
+    streets = streets[["region_code", "geometry"]].to_crs(epsg=2180)
+    admin = admin_gdf[["admin_name", "geometry"]].to_crs(epsg=2180)
+
+    clipped = gpd.overlay(streets, admin, how="intersection")
+    clipped["length"] = clipped.geometry.length
+
+    totals = clipped.groupby(["region_code", "admin_name"])["length"].sum()
+    return totals.groupby(level="region_code").idxmax().apply(lambda t: t[1])
 
 
 def _build_region_code(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -67,8 +130,20 @@ def _build_region_code(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return gdf
 
 
-def _extract_regions(gdf: gpd.GeoDataFrame, output_path: str) -> None:
-    """Extract unique regions and save as CSV with boundary WKT."""
+def _extract_regions(
+    gdf: gpd.GeoDataFrame,
+    output_path: str,
+    voivodeships: pd.Series | None = None,  # type: ignore[type-arg]
+    districts: pd.Series | None = None,  # type: ignore[type-arg]
+) -> None:
+    """Extract unique regions and save as CSV with boundary WKT.
+
+    Args:
+        gdf: Streets GeoDataFrame with region_code and geometry columns.
+        output_path: Path to the output CSV file.
+        voivodeships: Series mapping region_code to voivodeship name.
+        districts: Series mapping region_code to district name.
+    """
     regions_gdf = gdf[gdf["region_code"] != ""].copy()
 
     def _hull(g: gpd.GeoSeries) -> object:
@@ -80,7 +155,30 @@ def _extract_regions(gdf: gpd.GeoDataFrame, output_path: str) -> None:
     )
 
     grouped["boundary_wkt"] = grouped["geometry"].apply(lambda g: g.wkt)
-    regions_df = grouped[["name", "boundary_wkt"]].reset_index()
+
+    if voivodeships is not None:
+        grouped["administrative_district_lvl_1"] = voivodeships
+        grouped["administrative_district_lvl_1"] = grouped[
+            "administrative_district_lvl_1"
+        ].fillna("")
+    else:
+        grouped["administrative_district_lvl_1"] = ""
+
+    if districts is not None:
+        grouped["administrative_district_lvl_2"] = districts
+        grouped["administrative_district_lvl_2"] = grouped[
+            "administrative_district_lvl_2"
+        ].fillna("")
+    else:
+        grouped["administrative_district_lvl_2"] = ""
+
+    output_columns = [
+        "name",
+        "boundary_wkt",
+        "administrative_district_lvl_1",
+        "administrative_district_lvl_2",
+    ]
+    regions_df = grouped[output_columns].reset_index()
 
     regions_df.to_csv(output_path, index=False)
     logger.info("Saved %d regions to %s", len(regions_df), output_path)
@@ -91,6 +189,8 @@ def transform(
     streets_output_path: str,
     regions_output_path: str,
     layer_name: str,
+    voivodeships_path: str | None = None,
+    districts_path: str | None = None,
 ) -> None:
     """Read GeoPackage, transform to Path model schema, save streets and regions.
 
@@ -99,6 +199,8 @@ def transform(
         streets_output_path: Path to the output streets GeoPackage file.
         regions_output_path: Path to the output regions CSV file.
         layer_name: Layer name inside the input GeoPackage.
+        voivodeships_path: Path to GeoPackage with voivodeship boundaries.
+        districts_path: Path to GeoPackage with district boundaries.
     """
     gdf = gpd.read_file(input_path, layer=layer_name)
     total_rows = len(gdf)
@@ -130,8 +232,33 @@ def transform(
     # Build region_code from teryt + simc
     gdf = _build_region_code(gdf)
 
+    # Load admin boundaries and assign districts
+    voivodeships: pd.Series | None = None  # type: ignore[type-arg]
+    districts: pd.Series | None = None  # type: ignore[type-arg]
+
+    admin_name_col = "JPT_NAZWA_"
+    admin_code_col = "JPT_KOD_JE"
+
+    if voivodeships_path:
+        voiv_gdf = _load_admin_boundaries(
+            voivodeships_path,
+            layer="a01_granice_wojewodztw__msa01_granice_wojewodztw",
+            name_col=admin_name_col,
+            code_col=admin_code_col,
+        )
+        voivodeships = _assign_admin_district(gdf, voiv_gdf)
+
+    if districts_path:
+        dist_gdf = _load_admin_boundaries(
+            districts_path,
+            layer="a02_granice_powiatow__msa02_granice_powiatow",
+            name_col=admin_name_col,
+            code_col=admin_code_col,
+        )
+        districts = _assign_admin_district(gdf, dist_gdf)
+
     # Extract regions before dropping source columns
-    _extract_regions(gdf, regions_output_path)
+    _extract_regions(gdf, regions_output_path, voivodeships, districts)
 
     # Rename source columns to match Path model schema
     gdf = gdf.rename(columns={"nazwa": "name"})
@@ -169,4 +296,6 @@ if __name__ == "__main__":
         streets_output_path=args["streets_output_path"],
         regions_output_path=args["regions_output_path"],
         layer_name=args["layer_name"],
+        voivodeships_path=args["voivodeships_path"],
+        districts_path=args["districts_path"],
     )

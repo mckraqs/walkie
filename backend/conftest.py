@@ -19,6 +19,8 @@ def sample_region() -> Region:
         code="0001_0001",
         name="Test Region",
         boundary=GEOSGeometry(SAMPLE_POLYGON_WKT, srid=4326),
+        administrative_district_lvl_1="mazowieckie",
+        administrative_district_lvl_2="Warszawa",
     )
 
 

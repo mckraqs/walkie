@@ -1,6 +1,8 @@
 export interface RegionProperties {
   code: string;
   name: string;
+  administrative_district_lvl_1: string;
+  administrative_district_lvl_2: string;
   description: string;
   created_at: string;
   updated_at: string;
@@ -32,4 +34,12 @@ export interface PathFeature {
 export interface PathFeatureCollection {
   type: "FeatureCollection";
   features: PathFeature[];
+}
+
+export interface RegionListItem {
+  id: number;
+  code: string;
+  name: string;
+  administrative_district_lvl_1: string;
+  administrative_district_lvl_2: string;
 }

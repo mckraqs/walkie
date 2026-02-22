@@ -11,6 +11,8 @@ class Region(models.Model):
     code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=255)
     boundary = models.MultiPolygonField(srid=4326)
+    administrative_district_lvl_1 = models.CharField(max_length=100, blank=True)
+    administrative_district_lvl_2 = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
