@@ -17,3 +17,14 @@ misc/
 package/
 packages/
 python/
+
+# Environment
+.env
+
+# Backend
+backend/staticfiles/
+backend/mediafiles/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/

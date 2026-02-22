@@ -1,0 +1,14 @@
+services:
+  db:
+    image: imresamu/postgis:17-3.5
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: walkie
+      POSTGRES_USER: walkie
+      POSTGRES_PASSWORD: walkie
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

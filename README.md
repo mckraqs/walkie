@@ -21,6 +21,83 @@ datasets are uploaded.
 - **Database**: PostgreSQL + PostGIS + pgRouting
 - **Infrastructure**: Docker, GitHub Actions
 
-## Development
+## Prerequisites
 
-*To be documented as the project takes shape.*
+- **Python 3.14+** (managed via [uv](https://docs.astral.sh/uv/))
+- **Node.js 25+** / npm 11+
+- **Docker Desktop**
+- **GDAL** -- `brew install gdal` on macOS (provides GDAL and GEOS libraries for
+  GeoDjango)
+
+## Getting Started
+
+Setting up the project and starting the app:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/<your-org>/walkie.git
+cd walkie
+
+# 2. Copy environment file and customize if needed
+cp .env.example .env
+
+# 3. Install Python dependencies
+uv sync
+
+# 4. Start PostGIS database
+open -a Docker          # ensure Docker Desktop is running
+docker compose up -d
+
+# 5. Apply database migrations
+uv run python backend/manage.py migrate
+
+# 6. Start the backend (runs on http://localhost:8000)
+uv run python backend/manage.py runserver
+
+# 7. In a separate terminal, start the frontend (runs on http://localhost:3000)
+cd frontend && npm install && npm run dev
+```
+
+To stop everything, run below commands:
+
+```bash
+# Stop the frontend and backend servers with Ctrl+C in their respective terminals
+
+# Stop the database
+docker compose down
+```
+
+## Configuration
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and adjust as needed. The backend falls back to
+development defaults (`walkie`/`walkie`/`walkie`) when variables are unset.
+
+| Variable            | Description              | Default     |
+| ------------------- | ------------------------ | ----------- |
+| `POSTGRES_DB`       | Database name            | `walkie`    |
+| `POSTGRES_USER`     | Database user            | `walkie`    |
+| `POSTGRES_PASSWORD` | Database password        | `walkie`    |
+| `POSTGRES_HOST`     | Database host            | `localhost` |
+| `POSTGRES_PORT`     | Database port            | `5432`      |
+
+### GDAL / GEOS Library Paths
+
+GeoDjango requires GDAL and GEOS native libraries. On macOS with Homebrew the defaults
+point to `/opt/homebrew/lib/`. Override via environment variables if your paths differ:
+
+```bash
+export GDAL_LIBRARY_PATH="/opt/homebrew/lib/libgdal.dylib"
+export GEOS_LIBRARY_PATH="/opt/homebrew/lib/libgeos_c.dylib"
+```
+
+### CORS
+
+The backend allows requests from `http://localhost:3000` (the Next.js dev server).
+This is configured in `backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
+
+### PostGIS Docker Image
+
+The project uses `imresamu/postgis:17-3.5`, which provides multi-architecture builds
+(AMD64 and ARM64). No platform flag is needed on Apple Silicon Macs.

@@ -1,11 +1,20 @@
 [project]
-name = "global"
+name = "walkie"
 version = "0.1.0"
-description = "Add your description here"
+description = "Route-planning app to fully discover your favorite regions"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "django>=6.0.2",
+    "django-cors-headers>=4.9.0",
+    "djangorestframework>=3.16.1",
+    "djangorestframework-gis>=1.2.0",
+    "geopandas>=1.0.1",
+    "ipykernel>=7.2.0",
     "pre-commit>=4.3.0",
+    "psycopg[binary]>=3.3.3",
+    "pytest>=9.0.2",
+    "pytest-django>=4.12.0",
     "ruff>=0.15.2",
 ]
 
@@ -13,6 +22,8 @@ dependencies = [
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "INFO"
+DJANGO_SETTINGS_MODULE = "walkie.settings"
+pythonpath = ["backend"]
 
 [tool.pyright]
 pythonVersion = "3.14"
@@ -29,8 +40,8 @@ reportInferoredType = true
 line-length = 88
 indent-width = 4
 target-version = "py314"
-exclude = ["dir1", "dir2"]
-src = ["dir1", "dir2"]
+exclude = ["backend/*/migrations", ".venv"]
+src = ["backend"]
 
 [tool.ruff.lint]
 ignore = [

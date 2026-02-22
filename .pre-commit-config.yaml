@@ -12,34 +12,19 @@ repos:
       - id: ruff-format
         stages: ["pre-commit"]
         types_or: [python, pyi]
-  - repo: https://github.com/gruntwork-io/pre-commit
-    rev: v0.1.30
-    hooks:
-      - id: terraform-fmt
-      - id: tflint
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
     rev: 0.9.3
     hooks:
       # Update the uv lockfile
       - id: uv-lock
-  # CircleCI validation
-  - repo: local
-    hooks:
-      - id: circleci-validate-setup
-        name: Validate CircleCI setup configuration
-        stages: ["pre-commit"]
-        language: system
-        pass_filenames: false
-        files: ^.circleci/config.yml$
-        entry: circleci config validate .circleci/config.yml
   # Local type checking
   - repo: local
     hooks:
       - id: run-pyright
         stages: ["pre-push"]
         name: Run pyright
-        entry: "uv run pyright ."
+        entry: "uv run pyright backend/"
         language: system
         pass_filenames: false
   # Run tests if available
@@ -50,7 +35,7 @@ repos:
         stages: ["pre-push"]
         language: system
         pass_filenames: false
-        entry: uv run pytest tests
+        entry: uv run pytest
   # Markdown linting
   - repo: local
     hooks:
