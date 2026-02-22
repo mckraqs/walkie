@@ -1,11 +1,14 @@
-"""Tests for the paths app -- load_streets management command."""
+"""Tests for the paths app."""
 
 from pathlib import Path as FilePath
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from django.contrib.gis.geos import GEOSGeometry
+from rest_framework.test import APIClient
 
+from conftest import SAMPLE_LINESTRING_WKT
 from paths.management.commands.load_streets import Command
 from paths.models import Path
 from regions.models import Region
@@ -128,3 +131,74 @@ class TestBuildPathObjects:
 
         assert len(path_objects) == 0
         assert skipped == 1
+
+
+@pytest.mark.django_db
+class TestRegionPathsListView:
+    """Tests for the GET /api/regions/{id}/paths/ endpoint."""
+
+    def test_returns_geojson_feature_collection(self, saved_region: Region) -> None:
+        """Endpoint returns a GeoJSON FeatureCollection with correct properties."""
+        Path.objects.create(
+            region=saved_region,
+            name="Test Street",
+            geometry=GEOSGeometry(SAMPLE_LINESTRING_WKT, srid=4326),
+            category="street",
+            surface="asphalt",
+            accessible=True,
+            is_lit=True,
+        )
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["type"] == "FeatureCollection"
+        assert len(data["features"]) == 1
+
+        feature = data["features"][0]
+        assert feature["type"] == "Feature"
+        assert feature["geometry"]["type"] == "MultiLineString"
+        assert feature["properties"]["name"] == "Test Street"
+        assert feature["properties"]["category"] == "street"
+        assert feature["properties"]["surface"] == "asphalt"
+        assert feature["properties"]["accessible"] is True
+        assert feature["properties"]["is_lit"] is True
+        assert "created_at" in feature["properties"]
+
+    def test_empty_region_returns_empty_collection(self, saved_region: Region) -> None:
+        """Endpoint returns an empty FeatureCollection for a region with no paths."""
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["type"] == "FeatureCollection"
+        assert len(data["features"]) == 0
+
+    def test_paths_filtered_by_region(self, saved_region: Region) -> None:
+        """Endpoint only returns paths belonging to the requested region."""
+        other_region = Region.objects.create(
+            code="0002_0002",
+            name="Other Region",
+            boundary=GEOSGeometry(
+                "MULTIPOLYGON((("
+                "22.0 52.0, 23.0 52.0, 23.0 53.0, "
+                "22.0 53.0, 22.0 52.0)))",
+                srid=4326,
+            ),
+        )
+        geom = GEOSGeometry(SAMPLE_LINESTRING_WKT, srid=4326)
+        Path.objects.create(
+            region=saved_region, name="In Region", geometry=geom, category="street"
+        )
+        Path.objects.create(
+            region=other_region, name="Other Path", geometry=geom, category="street"
+        )
+
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+
+        data = response.json()
+        assert len(data["features"]) == 1
+        assert data["features"][0]["properties"]["name"] == "In Region"

@@ -1,11 +1,17 @@
-"""Tests for the regions app -- load_regions management command."""
+"""Tests for the regions app."""
 
 from pathlib import Path as FilePath
 
 import pytest
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
+from rest_framework.test import APIClient
 
 from regions.management.commands.load_regions import Command
+from regions.models import Region
+
+SAMPLE_POLYGON_WKT = (
+    "MULTIPOLYGON(((20.0 50.0, 21.0 50.0, 21.0 51.0, 20.0 51.0, 20.0 50.0)))"
+)
 
 
 @pytest.fixture
@@ -95,3 +101,29 @@ class TestValidateFile:
 
         with pytest.raises(ValueError, match=r"Expected a \.csv file"):
             command._validate_file(bad_file)
+
+
+@pytest.mark.django_db
+class TestRegionDetailView:
+    """Tests for the GET /api/regions/{id}/ endpoint."""
+
+    def test_returns_geojson_feature(self, saved_region: Region) -> None:
+        """Endpoint returns a GeoJSON Feature with correct properties."""
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["type"] == "Feature"
+        assert data["geometry"]["type"] == "MultiPolygon"
+        assert data["properties"]["code"] == saved_region.code
+        assert data["properties"]["name"] == saved_region.name
+        assert "created_at" in data["properties"]
+        assert "updated_at" in data["properties"]
+
+    def test_nonexistent_region_returns_404(self) -> None:
+        """Endpoint returns 404 for a nonexistent region ID."""
+        client = APIClient()
+        response = client.get("/api/regions/999999/")
+
+        assert response.status_code == 404
