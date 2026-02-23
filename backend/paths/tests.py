@@ -138,7 +138,9 @@ class TestBuildPathObjects:
 class TestRegionPathsListView:
     """Tests for the GET /api/regions/{id}/paths/ endpoint."""
 
-    def test_returns_geojson_feature_collection(self, saved_region: Region) -> None:
+    def test_returns_geojson_feature_collection(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
         """Endpoint returns a GeoJSON FeatureCollection with correct properties."""
         Path.objects.create(
             region=saved_region,
@@ -149,8 +151,7 @@ class TestRegionPathsListView:
             accessible=True,
             is_lit=True,
         )
-        client = APIClient()
-        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/paths/")
 
         assert response.status_code == 200
         data = response.json()
@@ -167,17 +168,20 @@ class TestRegionPathsListView:
         assert feature["properties"]["is_lit"] is True
         assert "created_at" in feature["properties"]
 
-    def test_empty_region_returns_empty_collection(self, saved_region: Region) -> None:
+    def test_empty_region_returns_empty_collection(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
         """Endpoint returns an empty FeatureCollection for a region with no paths."""
-        client = APIClient()
-        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/paths/")
 
         assert response.status_code == 200
         data = response.json()
         assert data["type"] == "FeatureCollection"
         assert len(data["features"]) == 0
 
-    def test_paths_filtered_by_region(self, saved_region: Region) -> None:
+    def test_paths_filtered_by_region(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
         """Endpoint only returns paths belonging to the requested region."""
         other_region = Region.objects.create(
             code="0002_0002",
@@ -197,12 +201,18 @@ class TestRegionPathsListView:
             region=other_region, name="Other Path", geometry=geom, category="street"
         )
 
-        client = APIClient()
-        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/paths/")
 
         data = response.json()
         assert len(data["features"]) == 1
         assert data["features"][0]["properties"]["name"] == "In Region"
+
+    def test_unauthenticated_returns_401(self, saved_region: Region) -> None:
+        """Endpoint returns 401 for unauthenticated access."""
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/paths/")
+
+        assert response.status_code == 401
 
 
 @pytest.mark.django_db

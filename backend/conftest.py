@@ -1,7 +1,10 @@
 """Shared test fixtures for the backend Django apps."""
 
 import pytest
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
 
 from paths.models import Path, Segment
 from regions.models import Region
@@ -11,6 +14,27 @@ SAMPLE_POLYGON_WKT = (
 )
 SAMPLE_LINESTRING_WKT = "MULTILINESTRING((20.0 50.0, 21.0 51.0))"
 SAMPLE_LINESTRING_WKT_SIMPLE = "LINESTRING(20.0 50.0, 21.0 51.0)"
+
+
+@pytest.fixture
+def user() -> User:
+    """Return a saved test user."""
+    return User.objects.create_user(username="testuser", password="testpassword123")
+
+
+@pytest.fixture
+def auth_token(user: User) -> Token:
+    """Return an auth token for the test user."""
+    token, _ = Token.objects.get_or_create(user=user)
+    return token
+
+
+@pytest.fixture
+def auth_client(auth_token: Token) -> APIClient:
+    """Return an APIClient authenticated with the test user's token."""
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Token {auth_token.key}")
+    return client
 
 
 @pytest.fixture

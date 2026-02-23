@@ -1,6 +1,7 @@
 """Tests for the routes app."""
 
 import pytest
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.management import call_command
 from django.db import connection
@@ -18,6 +19,7 @@ from routes.services import (
     get_route_path_names,
     get_route_segments,
 )
+from users.models import FavoriteRegion
 
 
 def _create_connected_segments(region: Region) -> list[Segment]:
@@ -295,10 +297,12 @@ class TestRouteGenerateView:
     def test_successful_route_generation(
         self,
         region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
     ) -> None:
         """200 response with segments, paths_count, and path_names."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        response = auth_client.post(
             f"/api/regions/{region_with_topology.pk}/routes/generate/",
             {"target_distance_km": 0.2},
             format="json",
@@ -319,10 +323,12 @@ class TestRouteGenerateView:
     def test_response_includes_start_and_end_points(
         self,
         region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
     ) -> None:
         """API response contains start_point and end_point coordinates."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        response = auth_client.post(
             f"/api/regions/{region_with_topology.pk}/routes/generate/",
             {"target_distance_km": 0.2},
             format="json",
@@ -337,10 +343,12 @@ class TestRouteGenerateView:
         assert len(data["start_point"]) == 2
         assert len(data["end_point"]) == 2
 
-    def test_invalid_distance_too_small(self, saved_region: Region) -> None:
+    def test_invalid_distance_too_small(
+        self, saved_region: Region, user: User, auth_client: APIClient
+    ) -> None:
         """400 for distance below minimum."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=saved_region)
+        response = auth_client.post(
             f"/api/regions/{saved_region.pk}/routes/generate/",
             {"target_distance_km": 0.01},
             format="json",
@@ -348,10 +356,12 @@ class TestRouteGenerateView:
 
         assert response.status_code == 400
 
-    def test_missing_distance(self, saved_region: Region) -> None:
+    def test_missing_distance(
+        self, saved_region: Region, user: User, auth_client: APIClient
+    ) -> None:
         """400 for empty request body."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=saved_region)
+        response = auth_client.post(
             f"/api/regions/{saved_region.pk}/routes/generate/",
             {},
             format="json",
@@ -359,10 +369,12 @@ class TestRouteGenerateView:
 
         assert response.status_code == 400
 
-    def test_no_topology_returns_422(self, saved_region: Region) -> None:
+    def test_no_topology_returns_422(
+        self, saved_region: Region, user: User, auth_client: APIClient
+    ) -> None:
         """422 with detail message when no routable segments exist."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=saved_region)
+        response = auth_client.post(
             f"/api/regions/{saved_region.pk}/routes/generate/",
             {"target_distance_km": 3.0},
             format="json",
@@ -371,10 +383,9 @@ class TestRouteGenerateView:
         assert response.status_code == 422
         assert "detail" in response.json()
 
-    def test_nonexistent_region_returns_404(self) -> None:
+    def test_nonexistent_region_returns_404(self, auth_client: APIClient) -> None:
         """404 when the region does not exist."""
-        client = APIClient()
-        response = client.post(
+        response = auth_client.post(
             "/api/regions/999999/routes/generate/",
             {"target_distance_km": 3.0},
             format="json",
@@ -385,10 +396,12 @@ class TestRouteGenerateView:
     def test_default_route_type_is_one_way(
         self,
         region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
     ) -> None:
         """Default route_type produces a non-loop route."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        response = auth_client.post(
             f"/api/regions/{region_with_topology.pk}/routes/generate/",
             {"target_distance_km": 0.2},
             format="json",
@@ -400,10 +413,12 @@ class TestRouteGenerateView:
     def test_loop_route_type(
         self,
         region_with_loop_topology: Region,
+        user: User,
+        auth_client: APIClient,
     ) -> None:
         """POST with route_type=loop returns is_loop=true."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=region_with_loop_topology)
+        response = auth_client.post(
             f"/api/regions/{region_with_loop_topology.pk}/routes/generate/",
             {"target_distance_km": 0.5, "route_type": "loop"},
             format="json",
@@ -412,10 +427,12 @@ class TestRouteGenerateView:
         assert response.status_code == 200
         assert response.json()["is_loop"] is True
 
-    def test_invalid_route_type_returns_400(self, saved_region: Region) -> None:
+    def test_invalid_route_type_returns_400(
+        self, saved_region: Region, user: User, auth_client: APIClient
+    ) -> None:
         """400 for invalid route_type value."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=saved_region)
+        response = auth_client.post(
             f"/api/regions/{saved_region.pk}/routes/generate/",
             {"target_distance_km": 3.0, "route_type": "invalid"},
             format="json",
@@ -426,10 +443,12 @@ class TestRouteGenerateView:
     def test_response_includes_path_names(
         self,
         region_with_topology_and_paths: Region,
+        user: User,
+        auth_client: APIClient,
     ) -> None:
         """Response contains non-empty path_names when segments are linked."""
-        client = APIClient()
-        response = client.post(
+        FavoriteRegion.objects.create(user=user, region=region_with_topology_and_paths)
+        response = auth_client.post(
             f"/api/regions/{region_with_topology_and_paths.pk}/routes/generate/",
             {"target_distance_km": 0.2},
             format="json",
@@ -441,6 +460,30 @@ class TestRouteGenerateView:
         assert len(data["path_names"]) > 0
         # Blank names must be filtered out
         assert "" not in data["path_names"]
+
+    def test_unauthenticated_returns_401(self, saved_region: Region) -> None:
+        """401 for unauthenticated access."""
+        client = APIClient()
+        response = client.post(
+            f"/api/regions/{saved_region.pk}/routes/generate/",
+            {"target_distance_km": 3.0},
+            format="json",
+        )
+
+        assert response.status_code == 401
+
+    def test_non_favorite_region_returns_403(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
+        """403 when region is not in user's favorites."""
+        response = auth_client.post(
+            f"/api/regions/{saved_region.pk}/routes/generate/",
+            {"target_distance_km": 3.0},
+            format="json",
+        )
+
+        assert response.status_code == 403
+        assert "detail" in response.json()
 
 
 @pytest.mark.django_db

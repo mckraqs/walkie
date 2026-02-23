@@ -20,6 +20,7 @@ from routes.services import (
     get_route_path_names,
     get_route_segments,
 )
+from users.models import FavoriteRegion
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,13 @@ class RouteGenerateView(APIView):
         Returns:
             Response with route data or error details.
         """
-        get_object_or_404(Region, pk=region_id)
+        region = get_object_or_404(Region, pk=region_id)
+
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Route generation is restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         serializer = RouteGenerateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

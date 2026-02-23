@@ -129,10 +129,11 @@ class TestValidateFile:
 class TestRegionDetailView:
     """Tests for the GET /api/regions/{id}/ endpoint."""
 
-    def test_returns_geojson_feature(self, saved_region: Region) -> None:
+    def test_returns_geojson_feature(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
         """Endpoint returns a GeoJSON Feature with correct properties."""
-        client = APIClient()
-        response = client.get(f"/api/regions/{saved_region.pk}/")
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/")
 
         assert response.status_code == 200
         data = response.json()
@@ -150,23 +151,31 @@ class TestRegionDetailView:
         )
         assert "created_at" in data["properties"]
         assert "updated_at" in data["properties"]
+        assert "is_favorite" in data["properties"]
 
-    def test_nonexistent_region_returns_404(self) -> None:
+    def test_nonexistent_region_returns_404(self, auth_client: APIClient) -> None:
         """Endpoint returns 404 for a nonexistent region ID."""
-        client = APIClient()
-        response = client.get("/api/regions/999999/")
+        response = auth_client.get("/api/regions/999999/")
 
         assert response.status_code == 404
+
+    def test_unauthenticated_returns_401(self, saved_region: Region) -> None:
+        """Endpoint returns 401 for unauthenticated access."""
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/")
+
+        assert response.status_code == 401
 
 
 @pytest.mark.django_db
 class TestRegionListView:
     """Tests for the GET /api/regions/ endpoint."""
 
-    def test_returns_flat_json_list(self, saved_region: Region) -> None:
+    def test_returns_flat_json_list(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
         """Endpoint returns a JSON array with expected fields, no boundary."""
-        client = APIClient()
-        response = client.get("/api/regions/")
+        response = auth_client.get("/api/regions/")
 
         assert response.status_code == 200
         data = response.json()
@@ -186,11 +195,18 @@ class TestRegionListView:
         )
         assert "boundary" not in item
         assert "geometry" not in item
+        assert "is_favorite" in item
 
-    def test_empty_database_returns_empty_list(self) -> None:
+    def test_empty_database_returns_empty_list(self, auth_client: APIClient) -> None:
         """Endpoint returns an empty list when no regions exist."""
-        client = APIClient()
-        response = client.get("/api/regions/")
+        response = auth_client.get("/api/regions/")
 
         assert response.status_code == 200
         assert response.json() == []
+
+    def test_unauthenticated_returns_401(self) -> None:
+        """Endpoint returns 401 for unauthenticated access."""
+        client = APIClient()
+        response = client.get("/api/regions/")
+
+        assert response.status_code == 401

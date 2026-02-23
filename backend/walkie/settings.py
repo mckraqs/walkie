@@ -52,11 +52,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.gis",
     "rest_framework",
+    "rest_framework.authtoken",
     "rest_framework_gis",
     "corsheaders",
     "regions",
     "paths",
     "routes",
+    "users",
 ]
 
 MIDDLEWARE = [
@@ -147,3 +149,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CORS
 CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+
+# Django REST Framework
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
