@@ -3,13 +3,14 @@
 import pytest
 from django.contrib.gis.geos import GEOSGeometry
 
-from paths.models import Path
+from paths.models import Path, Segment
 from regions.models import Region
 
 SAMPLE_POLYGON_WKT = (
     "MULTIPOLYGON(((20.0 50.0, 21.0 50.0, 21.0 51.0, 20.0 51.0, 20.0 50.0)))"
 )
 SAMPLE_LINESTRING_WKT = "MULTILINESTRING((20.0 50.0, 21.0 51.0))"
+SAMPLE_LINESTRING_WKT_SIMPLE = "LINESTRING(20.0 50.0, 21.0 51.0)"
 
 
 @pytest.fixture
@@ -39,10 +40,38 @@ def sample_path(sample_region: Region) -> Path:
 
 
 @pytest.fixture
+def sample_segment(sample_region: Region) -> Segment:
+    """Return an unsaved Segment instance with valid geometry."""
+    return Segment(
+        region=sample_region,
+        name="Test Segment",
+        geometry=GEOSGeometry(SAMPLE_LINESTRING_WKT_SIMPLE, srid=4326),
+        category="street",
+        surface="asphalt",
+        accessible=True,
+        is_lit=True,
+    )
+
+
+@pytest.fixture
 def saved_region(sample_region: Region) -> Region:
     """Return a saved Region instance (requires DB access)."""
     sample_region.save()
     return sample_region
+
+
+@pytest.fixture
+def saved_segment(saved_region: Region) -> Segment:
+    """Return a saved Segment instance (requires DB access)."""
+    return Segment.objects.create(
+        region=saved_region,
+        name="Test Segment",
+        geometry=GEOSGeometry(SAMPLE_LINESTRING_WKT_SIMPLE, srid=4326),
+        category="street",
+        surface="asphalt",
+        accessible=True,
+        is_lit=True,
+    )
 
 
 @pytest.fixture

@@ -27,7 +27,7 @@ export interface RegionFeature {
 export interface PathFeature {
   id: number;
   type: "Feature";
-  geometry: GeoJSON.MultiLineString;
+  geometry: GeoJSON.MultiLineString | GeoJSON.LineString;
   properties: PathProperties;
 }
 
@@ -42,4 +42,14 @@ export interface RegionListItem {
   name: string;
   administrative_district_lvl_1: string;
   administrative_district_lvl_2: string;
+}
+
+export interface RouteGenerateRequest {
+  target_distance_km: number;
+}
+
+export interface RouteResponse {
+  total_distance: number;
+  estimated_duration: number;
+  paths: PathFeatureCollection;
 }

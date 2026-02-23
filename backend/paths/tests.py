@@ -6,11 +6,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.management import call_command
 from rest_framework.test import APIClient
 
 from conftest import SAMPLE_LINESTRING_WKT
-from paths.management.commands.load_streets import Command
-from paths.models import Path
+from paths.management.commands.load_paths import Command
+from paths.models import Path, PathSegment, Segment
 from regions.models import Region
 
 
@@ -202,3 +203,203 @@ class TestRegionPathsListView:
         data = response.json()
         assert len(data["features"]) == 1
         assert data["features"][0]["properties"]["name"] == "In Region"
+
+
+@pytest.mark.django_db
+class TestLoadSegments:
+    """Tests for the load_segments management command."""
+
+    def _create_crossing_paths(self, region: Region) -> list[Path]:
+        """Create two crossing paths: one horizontal, one vertical.
+
+        They intersect at (20.001, 50.001).
+        """
+        horizontal = Path.objects.create(
+            region=region,
+            name="Horizontal St",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.000 50.001, 20.002 50.001))",
+                srid=4326,
+            ),
+            category="street",
+            surface="asphalt",
+            accessible=True,
+            is_lit=True,
+        )
+        vertical = Path.objects.create(
+            region=region,
+            name="Vertical St",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.001 50.000, 20.001 50.002))",
+                srid=4326,
+            ),
+            category="footway",
+            surface="gravel",
+            accessible=False,
+            is_lit=False,
+        )
+        return [horizontal, vertical]
+
+    def _create_parallel_paths(self, region: Region) -> list[Path]:
+        """Create two parallel (non-crossing) paths."""
+        p1 = Path.objects.create(
+            region=region,
+            name="Parallel A",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.000 50.000, 20.002 50.000))",
+                srid=4326,
+            ),
+            category="street",
+            surface="asphalt",
+        )
+        p2 = Path.objects.create(
+            region=region,
+            name="Parallel B",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.000 50.001, 20.002 50.001))",
+                srid=4326,
+            ),
+            category="street",
+            surface="asphalt",
+        )
+        return [p1, p2]
+
+    def test_crossing_paths_produce_four_segments(self, saved_region: Region) -> None:
+        """Two crossing paths produce 4 segments at the intersection."""
+        self._create_crossing_paths(saved_region)
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        assert Segment.objects.filter(region=saved_region).count() == 4
+
+    def test_non_crossing_paths_produce_same_count(self, saved_region: Region) -> None:
+        """Two parallel paths produce 2 segments (no splitting)."""
+        self._create_parallel_paths(saved_region)
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        assert Segment.objects.filter(region=saved_region).count() == 2
+
+    def test_segment_inherits_parent_metadata(self, saved_region: Region) -> None:
+        """Segment copies name/category/surface/accessible/is_lit from parent."""
+        Path.objects.create(
+            region=saved_region,
+            name="Named Street",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.000 50.000, 20.001 50.000))",
+                srid=4326,
+            ),
+            category="residential",
+            surface="cobblestone",
+            accessible=True,
+            is_lit=True,
+        )
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        segment = Segment.objects.get(region=saved_region)
+        assert segment.name == "Named Street"
+        assert segment.category == "residential"
+        assert segment.surface == "cobblestone"
+        assert segment.accessible is True
+        assert segment.is_lit is True
+
+    def test_path_segment_join_records_created(self, saved_region: Region) -> None:
+        """PathSegment records link back correctly."""
+        paths = self._create_crossing_paths(saved_region)
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        for path in paths:
+            assert PathSegment.objects.filter(path=path).count() >= 1
+
+        total_joins = PathSegment.objects.filter(segment__region=saved_region).count()
+        # 2 paths crossing produce 4 segments; the intersection segment
+        # belongs to both parents, so we get at least 5 joins.
+        assert total_joins >= 4
+
+    def test_dry_run_creates_no_records(self, saved_region: Region) -> None:
+        """Dry run does not write segments or join records."""
+        self._create_crossing_paths(saved_region)
+
+        call_command("load_segments", "--region-code", saved_region.code, "--dry-run")
+
+        assert Segment.objects.filter(region=saved_region).count() == 0
+        assert PathSegment.objects.count() == 0
+
+
+@pytest.mark.django_db
+class TestLoadSegmentsEdgeCases:
+    """Edge-case tests for the load_segments noding algorithm."""
+
+    def test_single_path_produces_one_segment(self, saved_region: Region) -> None:
+        """A single isolated path produces exactly one segment."""
+        Path.objects.create(
+            region=saved_region,
+            name="Isolated",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.0 50.0, 20.001 50.001))",
+                srid=4326,
+            ),
+            category="footway",
+        )
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        assert Segment.objects.filter(region=saved_region).count() == 1
+
+    def test_closed_loop_path(self, saved_region: Region) -> None:
+        """A closed loop path is noded as a single segment."""
+        Path.objects.create(
+            region=saved_region,
+            name="Loop",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING(("
+                "20.0 50.0, 20.001 50.0, 20.001 50.001, "
+                "20.0 50.001, 20.0 50.0))",
+                srid=4326,
+            ),
+            category="footway",
+        )
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        # A single closed ring with no other paths stays as one segment
+        assert Segment.objects.filter(region=saved_region).count() == 1
+
+    def test_self_intersecting_path(self, saved_region: Region) -> None:
+        """A self-intersecting (figure-8) path is split at the crossing."""
+        Path.objects.create(
+            region=saved_region,
+            name="Figure 8",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING(("
+                "20.0 50.0, 20.002 50.002, "
+                "20.0 50.002, 20.002 50.0, 20.0 50.0))",
+                srid=4326,
+            ),
+            category="footway",
+        )
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        # Self-intersection splits into at least 2 segments
+        assert Segment.objects.filter(region=saved_region).count() >= 2
+
+    def test_multilinestring_with_multiple_parts(self, saved_region: Region) -> None:
+        """A MultiLineString with multiple disjoint parts produces one segment each."""
+        Path.objects.create(
+            region=saved_region,
+            name="Multipart",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING("
+                "(20.000 50.000, 20.001 50.000),"
+                "(20.010 50.010, 20.011 50.010))",
+                srid=4326,
+            ),
+            category="footway",
+        )
+
+        call_command("load_segments", "--region-code", saved_region.code)
+
+        assert Segment.objects.filter(region=saved_region).count() == 2

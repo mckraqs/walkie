@@ -28,7 +28,8 @@ export GEOS_LIBRARY_PATH="/opt/homebrew/lib/libgeos_c.dylib"
 The backend allows requests from `http://localhost:3000` (the Next.js dev server).
 This is configured in `backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
 
-## PostGIS Docker Image
+## Database Docker Image
 
-The project uses `imresamu/postgis:17-3.5`, which provides multi-architecture builds
-(AMD64 and ARM64). No platform flag is needed on Apple Silicon Macs.
+The project uses `pgrouting/pgrouting:17-3.5-3.7.3`, which includes PostGIS and
+pgRouting extensions with multi-architecture builds (AMD64 and ARM64). No platform flag
+is needed on Apple Silicon Macs.

@@ -1,4 +1,4 @@
-"""Management command to load streets from a cleaned GeoPackage into the database."""
+"""Management command to load paths from a cleaned GeoPackage into the database."""
 
 import logging
 from pathlib import Path as FilePath
@@ -26,9 +26,9 @@ REQUIRED_COLUMNS = {
 
 
 class Command(BaseCommand):
-    """Load street geometries from a cleaned GeoPackage into the Path model."""
+    """Load path geometries from a cleaned GeoPackage into the Path model."""
 
-    help = "Import streets from a cleaned GeoPackage file into the database."
+    help = "Import paths from a cleaned GeoPackage file into the database."
 
     def add_arguments(self, parser: CommandParser) -> None:
         """Define command arguments."""

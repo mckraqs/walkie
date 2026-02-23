@@ -1,5 +1,5 @@
 import { fetchRegion, fetchRegionPaths } from "@/lib/api";
-import PathMapLoader from "@/components/PathMapLoader";
+import RegionExplorer from "@/components/RegionExplorer";
 
 interface RegionPageProps {
   params: Promise<{ regionId: string }>;
@@ -44,7 +44,7 @@ export default async function RegionPage({ params }: RegionPageProps) {
         </a>
       </header>
       <div className="flex-1">
-        <PathMapLoader region={region} paths={paths} />
+        <RegionExplorer regionId={regionId} region={region} paths={paths} />
       </div>
     </div>
   );

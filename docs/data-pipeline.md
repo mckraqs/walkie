@@ -96,3 +96,26 @@ uv run python backend/manage.py load_streets data/processed/streets.gpkg
 | -------------- | ------------------------------------------------ | ------- |
 | `--batch-size` | Number of records per `bulk_create` call          | `5000`  |
 | `--dry-run`    | Preview the load without writing to the database  | off     |
+
+### `build_topology`
+
+Builds the pgRouting network topology by running `pgr_createTopology` on the `paths`
+table. This populates the `source` and `target` columns needed for route generation.
+
+**Must be run after `load_streets`**, because it operates on paths already in the
+database.
+
+Required execution order:
+
+1. `load_regions`
+2. `load_streets`
+3. `build_topology`
+
+```bash
+uv run python backend/manage.py build_topology
+```
+
+| Option        | Description                                       | Default     |
+| ------------- | ------------------------------------------------- | ----------- |
+| `--tolerance`  | Snapping tolerance for node matching              | `0.00001`   |
+| `--clean`      | Drop and rebuild the topology from scratch        | off         |

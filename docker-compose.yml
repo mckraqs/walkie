@@ -1,6 +1,6 @@
 services:
   db:
-    image: imresamu/postgis:17-3.5
+    image: pgrouting/pgrouting:17-3.5-3.7.3
     ports:
       - "5432:5432"
     environment:

@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "regions",
     "paths",
+    "routes",
 ]
 
 MIDDLEWARE = [
