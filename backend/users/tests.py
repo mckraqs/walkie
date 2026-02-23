@@ -199,6 +199,7 @@ class TestFavoriteRegionListView:
         data = response.json()
         assert len(data) == 1
         assert data[0]["id"] == region.pk
+        assert data[0]["is_favorite"] is True
 
     def test_empty_favorites_returns_empty_list(self, auth_client: APIClient) -> None:
         """Returns an empty list when the user has no favorites."""

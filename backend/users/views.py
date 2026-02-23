@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Value
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.authentication import TokenAuthentication
@@ -100,6 +100,7 @@ class FavoriteRegionListView(generics.ListAPIView):
                 "administrative_district_lvl_1",
                 "administrative_district_lvl_2",
             )
+            .annotate(_is_favorite=Value(True))
             .order_by("administrative_district_lvl_1", "name")
         )
 
