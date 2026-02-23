@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { RouteResponse } from "@/types/geo";
+import type { RouteResponse, RouteType } from "@/types/geo";
 
 interface RoutePlannerProps {
   route: RouteResponse | null;
   loading: boolean;
   error: string | null;
-  onGenerate: (distanceKm: number) => void;
+  onGenerate: (distanceKm: number, routeType: RouteType) => void;
   onClear: () => void;
 }
 
@@ -26,12 +26,13 @@ export default function RoutePlanner({
   onClear,
 }: RoutePlannerProps) {
   const [distance, setDistance] = useState("3");
+  const [routeType, setRouteType] = useState<RouteType>("one_way");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const km = parseFloat(distance);
     if (!isNaN(km) && km >= 0.1 && km <= 50) {
-      onGenerate(km);
+      onGenerate(km, routeType);
     }
   }
 
@@ -41,33 +42,50 @@ export default function RoutePlanner({
         Route Planner
       </h3>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <div className="flex-1">
-          <label
-            htmlFor="distance"
-            className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
-          >
-            Distance (km)
-          </label>
-          <input
-            id="distance"
-            type="number"
-            min="0.1"
-            max="50"
-            step="0.1"
-            value={distance}
-            onChange={(e) => setDistance(e.target.value)}
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label
+              htmlFor="distance"
+              className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              Distance (km)
+            </label>
+            <input
+              id="distance"
+              type="number"
+              min="0.1"
+              max="50"
+              step="0.1"
+              value={distance}
+              onChange={(e) => setDistance(e.target.value)}
+              disabled={loading}
+              className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+            />
+          </div>
+          <button
+            type="submit"
             disabled={loading}
-            className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
-          />
+            className="mt-5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? "..." : "Generate"}
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "..." : "Generate"}
-        </button>
+
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={routeType === "loop"}
+            onChange={(e) =>
+              setRouteType(e.target.checked ? "loop" : "one_way")
+            }
+            disabled={loading}
+            className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800"
+          />
+          <span className="text-xs text-zinc-600 dark:text-zinc-400">
+            Loop route
+          </span>
+        </label>
       </form>
 
       {error && (
@@ -85,6 +103,13 @@ export default function RoutePlanner({
               <span className="font-medium">Segments:</span>{" "}
               {route.paths.features.length}
             </p>
+            {route.is_loop && (
+              <p>
+                <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                  Loop
+                </span>
+              </p>
+            )}
           </div>
           <button
             type="button"

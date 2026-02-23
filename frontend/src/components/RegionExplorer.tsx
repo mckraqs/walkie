@@ -8,6 +8,7 @@ import type {
   RegionFeature,
   PathFeatureCollection,
   RouteResponse,
+  RouteType,
 } from "@/types/geo";
 
 const PathMap = dynamic(() => import("@/components/PathMap"), { ssr: false });
@@ -28,12 +29,13 @@ export default function RegionExplorer({
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = useCallback(
-    async (distanceKm: number) => {
+    async (distanceKm: number, routeType: RouteType) => {
       setLoading(true);
       setError(null);
       try {
         const result = await generateRoute(regionId, {
           target_distance_km: distanceKm,
+          route_type: routeType,
         });
         setRoute(result);
       } catch (err) {

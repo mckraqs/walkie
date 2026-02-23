@@ -10,6 +10,10 @@ class RouteGenerateRequestSerializer(serializers.Serializer):
     """Validate a route generation request."""
 
     target_distance_km = serializers.FloatField(min_value=0.1, max_value=50.0)
+    route_type = serializers.ChoiceField(
+        choices=["one_way", "loop"],
+        default="one_way",
+    )
 
 
 class RouteSegmentSerializer(GeoFeatureModelSerializer):

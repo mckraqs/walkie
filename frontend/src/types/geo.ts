@@ -15,6 +15,7 @@ export interface PathProperties {
   accessible: boolean;
   is_lit: boolean;
   created_at: string;
+  sequence_index?: number;
 }
 
 export interface RegionFeature {
@@ -44,11 +45,17 @@ export interface RegionListItem {
   administrative_district_lvl_2: string;
 }
 
+export type RouteType = "one_way" | "loop";
+
 export interface RouteGenerateRequest {
   target_distance_km: number;
+  route_type?: RouteType;
 }
 
 export interface RouteResponse {
   total_distance: number;
+  is_loop: boolean;
+  start_point: [number, number] | null;
+  end_point: [number, number] | null;
   paths: PathFeatureCollection;
 }

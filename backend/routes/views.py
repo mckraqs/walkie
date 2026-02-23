@@ -13,7 +13,12 @@ from routes.serializers import (
     RouteGenerateRequestSerializer,
     RouteSegmentSerializer,
 )
-from routes.services import RouteGenerationError, generate_route, get_route_segments
+from routes.services import (
+    RouteGenerationError,
+    RouteType,
+    generate_route,
+    get_route_segments,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +42,17 @@ class RouteGenerateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         target_distance_m = serializer.validated_data["target_distance_km"] * 1000
+        route_type = RouteType(serializer.validated_data["route_type"])
 
         logger.info(
-            "Route request: region_id=%d, target_distance_m=%.0f",
+            "Route request: region_id=%d, target_distance_m=%.0f, route_type=%s",
             region_id,
             target_distance_m,
+            route_type.value,
         )
 
         try:
-            result = generate_route(region_id, target_distance_m)
+            result = generate_route(region_id, target_distance_m, route_type)
         except RouteGenerationError as exc:
             logger.warning("Route generation failed: %s", exc)
             return Response(
@@ -65,6 +72,9 @@ class RouteGenerateView(APIView):
         return Response(
             {
                 "total_distance": result.total_distance,
+                "is_loop": result.is_loop,
+                "start_point": list(result.start_point) if result.start_point else None,
+                "end_point": list(result.end_point) if result.end_point else None,
                 "paths": paths_data,
             }
         )
