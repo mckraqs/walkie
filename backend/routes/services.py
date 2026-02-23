@@ -11,8 +11,6 @@ from paths.models import Segment
 
 logger = logging.getLogger(__name__)
 
-WALKING_SPEED_MPS = 1.25  # 4.5 km/h in meters per second
-
 
 class RouteGenerationError(Exception):
     """Raised when route generation fails."""
@@ -24,7 +22,6 @@ class RouteResult:
 
     segment_ids: list[int]
     total_distance: float  # meters
-    estimated_duration: float  # seconds
     start_node: int
     end_node: int
 
@@ -216,12 +213,10 @@ def _compute_shortest_path(
 
     segment_ids = [row[0] for row in rows]
     total_distance = rows[-1][1]  # last row's agg_cost is the total
-    estimated_duration = total_distance / WALKING_SPEED_MPS
 
     return RouteResult(
         segment_ids=segment_ids,
         total_distance=total_distance,
-        estimated_duration=estimated_duration,
         start_node=source_node,
         end_node=target_node,
     )

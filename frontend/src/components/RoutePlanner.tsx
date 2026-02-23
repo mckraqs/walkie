@@ -18,16 +18,6 @@ function formatDistance(meters: number): string {
   return `${Math.round(meters)} m`;
 }
 
-function formatDuration(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remaining = minutes % 60;
-    return `${hours}h ${remaining}min`;
-  }
-  return `${minutes} min`;
-}
-
 export default function RoutePlanner({
   route,
   loading,
@@ -90,10 +80,6 @@ export default function RoutePlanner({
             <p>
               <span className="font-medium">Distance:</span>{" "}
               {formatDistance(route.total_distance)}
-            </p>
-            <p>
-              <span className="font-medium">Duration:</span>{" "}
-              {formatDuration(route.estimated_duration)}
             </p>
             <p>
               <span className="font-medium">Segments:</span>{" "}

@@ -50,6 +50,5 @@ export interface RouteGenerateRequest {
 
 export interface RouteResponse {
   total_distance: number;
-  estimated_duration: number;
   paths: PathFeatureCollection;
 }

@@ -97,7 +97,6 @@ class TestGenerateRoute:
 
         assert len(result.segment_ids) > 0
         assert result.total_distance > 0
-        assert result.estimated_duration > 0
         assert result.start_node != result.end_node
 
     def test_raises_for_region_without_topology(
@@ -117,7 +116,7 @@ class TestRouteGenerateView:
         self,
         region_with_topology: Region,
     ) -> None:
-        """200 response with total_distance, estimated_duration, and paths."""
+        """200 response with total_distance and paths."""
         client = APIClient()
         response = client.post(
             f"/api/regions/{region_with_topology.pk}/routes/generate/",
@@ -128,9 +127,7 @@ class TestRouteGenerateView:
         assert response.status_code == 200
         data = response.json()
         assert "total_distance" in data
-        assert "estimated_duration" in data
         assert data["total_distance"] > 0
-        assert data["estimated_duration"] > 0
         assert "paths" in data
         assert data["paths"]["type"] == "FeatureCollection"
         assert len(data["paths"]["features"]) > 0

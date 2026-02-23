@@ -65,7 +65,6 @@ class RouteGenerateView(APIView):
         return Response(
             {
                 "total_distance": result.total_distance,
-                "estimated_duration": result.estimated_duration,
                 "paths": paths_data,
             }
         )
