@@ -17,6 +17,7 @@ from routes.services import (
     RouteGenerationError,
     RouteType,
     generate_route,
+    get_route_path_names,
     get_route_segments,
 )
 
@@ -61,7 +62,8 @@ class RouteGenerateView(APIView):
             )
 
         segments_qs = get_route_segments(result.segment_ids)
-        paths_data = RouteSegmentSerializer(segments_qs, many=True).data
+        segments_data = RouteSegmentSerializer(segments_qs, many=True).data
+        path_names = get_route_path_names(result.segment_ids)
 
         logger.info(
             "Route success: %d segments, %.0fm",
@@ -75,6 +77,8 @@ class RouteGenerateView(APIView):
                 "is_loop": result.is_loop,
                 "start_point": list(result.start_point) if result.start_point else None,
                 "end_point": list(result.end_point) if result.end_point else None,
-                "paths": paths_data,
+                "segments": segments_data,
+                "paths_count": len(path_names),
+                "path_names": path_names,
             }
         )

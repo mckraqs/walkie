@@ -164,8 +164,8 @@ function FitBounds({ region, paths, route }: PathMapProps) {
 
   useEffect(() => {
     const fitTarget =
-      route && route.paths.features.length > 0
-        ? route.paths
+      route && route.segments.features.length > 0
+        ? route.segments
         : paths.features.length > 0
           ? paths
           : region.geometry;
@@ -181,10 +181,10 @@ function FitBounds({ region, paths, route }: PathMapProps) {
 }
 
 export default function PathMap({ region, paths, route }: PathMapProps) {
-  const hasRoute = route && route.paths.features.length > 0;
+  const hasRoute = route && route.segments.features.length > 0;
   const baseStyle = hasRoute ? PATH_DIMMED_STYLE : PATH_STYLE;
   const baseHoverStyle = hasRoute ? PATH_DIMMED_STYLE : HOVER_STYLE;
-  const totalSegments = hasRoute ? route.paths.features.length : 0;
+  const totalSegments = hasRoute ? route.segments.features.length : 0;
 
   return (
     <MapContainer
@@ -220,7 +220,7 @@ export default function PathMap({ region, paths, route }: PathMapProps) {
         <>
           <GeoJSON
             key={`route-${route.total_distance}`}
-            data={route.paths}
+            data={route.segments}
             style={(feature) => {
               const props = (feature as PathFeature | undefined)?.properties;
               const seqIdx = props?.sequence_index ?? 0;

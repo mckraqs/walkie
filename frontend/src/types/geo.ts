@@ -57,5 +57,7 @@ export interface RouteResponse {
   is_loop: boolean;
   start_point: [number, number] | null;
   end_point: [number, number] | null;
-  paths: PathFeatureCollection;
+  segments: PathFeatureCollection;
+  paths_count: number;
+  path_names: string[];
 }

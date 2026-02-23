@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from django.db import connection
 from django.db.models import Case, IntegerField, QuerySet, When
 
-from paths.models import Segment
+from paths.models import PathSegment, Segment
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +100,35 @@ def get_route_segments(segment_ids: list[int]) -> QuerySet[Segment]:
         .annotate(sequence_index=ordering)
         .order_by(ordering)
     )
+
+
+def get_route_path_names(segment_ids: list[int]) -> list[str]:
+    """Resolve segment IDs to their parent Path names via PathSegment.
+
+    Names are returned in the order they first appear along the route,
+    matching the segment_ids traversal sequence.
+
+    Args:
+        segment_ids: Ordered list of segment IDs from a route result.
+
+    Returns:
+        Unique, non-blank path names in route traversal order.
+    """
+    if not segment_ids:
+        return []
+    mapping: dict[int, str] = dict(
+        PathSegment.objects.filter(segment_id__in=segment_ids)
+        .exclude(path__name="")
+        .values_list("segment_id", "path__name")
+    )
+    seen: set[str] = set()
+    result: list[str] = []
+    for seg_id in segment_ids:
+        name = mapping.get(seg_id)
+        if name and name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
 
 
 def _generate_one_way_route(

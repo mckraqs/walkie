@@ -100,9 +100,16 @@ export default function RoutePlanner({
               {formatDistance(route.total_distance)}
             </p>
             <p>
-              <span className="font-medium">Segments:</span>{" "}
-              {route.paths.features.length}
+              <span className="font-medium">Paths:</span>{" "}
+              {route.paths_count}
             </p>
+            {route.path_names.length > 0 && (
+              <ul className="ml-4 list-disc text-xs text-zinc-600 dark:text-zinc-400">
+                {route.path_names.map((name) => (
+                  <li key={name}>{name}</li>
+                ))}
+              </ul>
+            )}
             {route.is_loop && (
               <p>
                 <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">

@@ -6,7 +6,7 @@ from django.core.management import call_command
 from django.db import connection
 from rest_framework.test import APIClient
 
-from paths.models import Path, Segment
+from paths.models import Path, PathSegment, Segment
 from regions.models import Region
 from routes.services import (
     RouteGenerationError,
@@ -15,6 +15,7 @@ from routes.services import (
     _get_node_coordinates,
     _pick_random_source_node,
     generate_route,
+    get_route_path_names,
     get_route_segments,
 )
 
@@ -91,6 +92,51 @@ def _build_test_topology() -> None:
         )
 
 
+def _link_segments_to_paths(region: Region) -> list[Path]:
+    """Create Path objects and link them to existing segments via PathSegment.
+
+    Creates 3 paths: "Alpha Trail", "Beta Lane", and one with a blank name.
+    Links them to the first 3 segments in the region (one path per segment,
+    blank-named path on the third).
+
+    Returns:
+        The created Path objects.
+    """
+    segments = list(Segment.objects.filter(region=region).order_by("pk")[:3])
+    paths = [
+        Path.objects.create(
+            region=region,
+            name="Alpha Trail",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.000 50.000, 20.001 50.000))", srid=4326
+            ),
+            category="street",
+            surface="asphalt",
+        ),
+        Path.objects.create(
+            region=region,
+            name="Beta Lane",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.001 50.000, 20.002 50.000))", srid=4326
+            ),
+            category="street",
+            surface="asphalt",
+        ),
+        Path.objects.create(
+            region=region,
+            name="",
+            geometry=GEOSGeometry(
+                "MULTILINESTRING((20.002 50.000, 20.003 50.000))", srid=4326
+            ),
+            category="street",
+            surface="asphalt",
+        ),
+    ]
+    for path, segment in zip(paths, segments, strict=True):
+        PathSegment.objects.create(path=path, segment=segment)
+    return paths
+
+
 @pytest.fixture
 def region_with_topology(saved_region: Region) -> Region:
     """Create a region with connected segments and built topology."""
@@ -104,6 +150,15 @@ def region_with_loop_topology(saved_region: Region) -> Region:
     """Create a region with a diamond network and built topology."""
     _create_loop_network(saved_region)
     _build_test_topology()
+    return saved_region
+
+
+@pytest.fixture
+def region_with_topology_and_paths(saved_region: Region) -> Region:
+    """Create a region with topology and path-to-segment linkage."""
+    _create_connected_segments(saved_region)
+    _build_test_topology()
+    _link_segments_to_paths(saved_region)
     return saved_region
 
 
@@ -241,7 +296,7 @@ class TestRouteGenerateView:
         self,
         region_with_topology: Region,
     ) -> None:
-        """200 response with total_distance and paths."""
+        """200 response with segments, paths_count, and path_names."""
         client = APIClient()
         response = client.post(
             f"/api/regions/{region_with_topology.pk}/routes/generate/",
@@ -253,9 +308,13 @@ class TestRouteGenerateView:
         data = response.json()
         assert "total_distance" in data
         assert data["total_distance"] > 0
-        assert "paths" in data
-        assert data["paths"]["type"] == "FeatureCollection"
-        assert len(data["paths"]["features"]) > 0
+        assert "segments" in data
+        assert data["segments"]["type"] == "FeatureCollection"
+        assert len(data["segments"]["features"]) > 0
+        assert "paths_count" in data
+        assert "path_names" in data
+        assert isinstance(data["paths_count"], int)
+        assert isinstance(data["path_names"], list)
 
     def test_response_includes_start_and_end_points(
         self,
@@ -363,6 +422,91 @@ class TestRouteGenerateView:
         )
 
         assert response.status_code == 400
+
+    def test_response_includes_path_names(
+        self,
+        region_with_topology_and_paths: Region,
+    ) -> None:
+        """Response contains non-empty path_names when segments are linked."""
+        client = APIClient()
+        response = client.post(
+            f"/api/regions/{region_with_topology_and_paths.pk}/routes/generate/",
+            {"target_distance_km": 0.2},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["paths_count"] > 0
+        assert len(data["path_names"]) > 0
+        # Blank names must be filtered out
+        assert "" not in data["path_names"]
+
+
+@pytest.mark.django_db
+class TestGetRoutePathNames:
+    """Tests for get_route_path_names."""
+
+    def test_returns_names_in_route_order(
+        self, region_with_topology_and_paths: Region
+    ) -> None:
+        """Returns non-blank names in segment traversal order."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology_and_paths)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:3]
+        )
+        result = get_route_path_names(segment_ids)
+
+        assert result == ["Alpha Trail", "Beta Lane"]
+
+    def test_respects_reverse_segment_order(
+        self, region_with_topology_and_paths: Region
+    ) -> None:
+        """Reversed segment order produces reversed path name order."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology_and_paths)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:3]
+        )
+        result = get_route_path_names(list(reversed(segment_ids)))
+
+        assert result == ["Beta Lane", "Alpha Trail"]
+
+    def test_returns_empty_for_unlinked_segments(
+        self, region_with_topology: Region
+    ) -> None:
+        """Segments without PathSegment records return an empty list."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology).values_list(
+                "pk", flat=True
+            )
+        )
+        result = get_route_path_names(segment_ids)
+
+        assert result == []
+
+    def test_returns_empty_for_empty_input(self) -> None:
+        """Empty segment_ids returns an empty list."""
+        assert get_route_path_names([]) == []
+
+    def test_deduplicates_names(self, region_with_topology_and_paths: Region) -> None:
+        """Same path linked to multiple segments appears only once."""
+        segments = list(
+            Segment.objects.filter(region=region_with_topology_and_paths).order_by(
+                "pk"
+            )[:2]
+        )
+        # Link both segments to the same path
+        path = Path.objects.get(
+            region=region_with_topology_and_paths, name="Alpha Trail"
+        )
+        PathSegment.objects.create(path=path, segment=segments[1])
+
+        segment_ids = [s.pk for s in segments]
+        result = get_route_path_names(segment_ids)
+
+        assert result.count("Alpha Trail") == 1
 
 
 @pytest.mark.django_db
