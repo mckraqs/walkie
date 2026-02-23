@@ -9,6 +9,7 @@ interface RoutePlannerProps {
   error: string | null;
   onGenerate: (distanceKm: number, routeType: RouteType) => void;
   onClear: () => void;
+  isFavorite: boolean;
 }
 
 function formatDistance(meters: number): string {
@@ -24,6 +25,7 @@ export default function RoutePlanner({
   error,
   onGenerate,
   onClear,
+  isFavorite,
 }: RoutePlannerProps) {
   const [distance, setDistance] = useState("3");
   const [routeType, setRouteType] = useState<RouteType>("one_way");
@@ -65,12 +67,18 @@ export default function RoutePlanner({
           </div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isFavorite}
             className="mt-5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {loading ? "..." : "Generate"}
           </button>
         </div>
+
+        {!isFavorite && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Add this region to your favorites to generate routes.
+          </p>
+        )}
 
         <label className="flex cursor-pointer items-center gap-2">
           <input

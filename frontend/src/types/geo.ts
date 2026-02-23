@@ -1,3 +1,18 @@
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+}
+
 export interface RegionProperties {
   code: string;
   name: string;
@@ -6,6 +21,7 @@ export interface RegionProperties {
   description: string;
   created_at: string;
   updated_at: string;
+  is_favorite: boolean;
 }
 
 export interface PathProperties {
@@ -43,6 +59,7 @@ export interface RegionListItem {
   name: string;
   administrative_district_lvl_1: string;
   administrative_district_lvl_2: string;
+  is_favorite: boolean;
 }
 
 export type RouteType = "one_way" | "loop";

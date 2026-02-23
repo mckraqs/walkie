@@ -17,12 +17,14 @@ interface RegionExplorerProps {
   regionId: string;
   region: RegionFeature;
   paths: PathFeatureCollection;
+  isFavorite: boolean;
 }
 
 export default function RegionExplorer({
   regionId,
   region,
   paths,
+  isFavorite,
 }: RegionExplorerProps) {
   const [route, setRoute] = useState<RouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +65,7 @@ export default function RegionExplorer({
         error={error}
         onGenerate={handleGenerate}
         onClear={handleClear}
+        isFavorite={isFavorite}
       />
       <PathMap region={region} paths={paths} route={route} />
     </div>
