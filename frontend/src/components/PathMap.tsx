@@ -187,7 +187,6 @@ export default function PathMap({
   hoveredPathId,
   onPathHover,
   walkedPathIds,
-  onToggleWalk,
   isFavorite,
 }: PathMapProps) {
   const hasRoute = route && route.segments.features.length > 0;
@@ -223,7 +222,7 @@ export default function PathMap({
   } | null>(null);
   const tooltipPosRef = useRef({ x: 0, y: 0 });
   const tooltipElRef = useRef<HTMLDivElement>(null);
-  const tooltipPinnedRef = useRef(false);
+
   const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hoveredPathIdRef = useRef<number | null>(null);
 
@@ -270,8 +269,8 @@ export default function PathMap({
 
     return () => {
       layer.setStyle(getBaseStyle(hoveredPathId));
-      // Clear tooltip only if no active map hover and tooltip is not pinned
-      if (hoveredPathIdRef.current == null && !tooltipPinnedRef.current) {
+      // Clear tooltip only if no active map hover
+      if (hoveredPathIdRef.current == null) {
         setTooltipData(null);
       }
     };
@@ -321,7 +320,7 @@ export default function PathMap({
                   onPathHoverRef.current?.(pathId);
                 },
                 mousemove: (e) => {
-                  if (!tooltipPinnedRef.current && tooltipElRef.current) {
+                  if (tooltipElRef.current) {
                     const containerPoint = (
                       e as L.LeafletMouseEvent
                     ).containerPoint;
@@ -337,9 +336,7 @@ export default function PathMap({
                   hoveredPathIdRef.current = null;
                   onPathHoverRef.current?.(null);
                   hideTimerRef.current = setTimeout(() => {
-                    if (!tooltipPinnedRef.current) {
-                      setTooltipData(null);
-                    }
+                    setTooltipData(null);
                   }, 150);
                 },
               });
@@ -390,23 +387,10 @@ export default function PathMap({
       {tooltipData && (
         <div
           ref={tooltipElRef}
-          className="pointer-events-auto absolute z-[1001] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+          className="pointer-events-none absolute z-[1001] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
           style={{
             left: tooltipPosRef.current.x,
             top: tooltipPosRef.current.y,
-          }}
-          onMouseEnter={() => {
-            tooltipPinnedRef.current = true;
-            clearTimeout(hideTimerRef.current);
-          }}
-          onMouseLeave={() => {
-            tooltipPinnedRef.current = false;
-            if (hoveredPathIdRef.current == null) {
-              hideTimerRef.current = setTimeout(
-                () => setTooltipData(null),
-                150,
-              );
-            }
           }}
         >
           <strong className="text-zinc-900 dark:text-zinc-100">
@@ -425,15 +409,9 @@ export default function PathMap({
             Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
           </div>
           {isFavorite && !tooltipData.fromTable && (
-            <label className="mt-1 flex cursor-pointer items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
-              <input
-                type="checkbox"
-                className="accent-green-500"
-                checked={walkedPathIds?.has(tooltipData.pathId) ?? false}
-                onChange={() => onToggleWalk?.(tooltipData.pathId)}
-              />
-              Walked
-            </label>
+            <div className="text-zinc-600 dark:text-zinc-400">
+              Walked: {walkedPathIds?.has(tooltipData.pathId) ? "Yes" : "No"}
+            </div>
           )}
         </div>
       )}
