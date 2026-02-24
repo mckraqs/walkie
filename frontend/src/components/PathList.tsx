@@ -22,6 +22,7 @@ interface PathListProps {
   isFavorite: boolean;
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
+  selectedPathId: number | null;
   onPathHover: (pathId: number | null) => void;
   onPathClick: (pathId: number) => void;
   onToggleWalk: (pathId: number) => void;
@@ -33,6 +34,7 @@ export default function PathList({
   isFavorite,
   showWalkedOnly,
   hoveredPathId,
+  selectedPathId,
   onPathHover,
   onPathClick,
   onToggleWalk,
@@ -42,12 +44,12 @@ export default function PathList({
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    if (hoveredPathId == null) return;
-    const el = rowRefs.current.get(hoveredPathId);
+    if (selectedPathId == null) return;
+    const el = rowRefs.current.get(selectedPathId);
     if (el) {
       el.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-  }, [hoveredPathId]);
+  }, [selectedPathId]);
 
   const displayedPaths = useMemo(() => {
     let filtered = showWalkedOnly
@@ -115,6 +117,7 @@ export default function PathList({
       <div className="flex-1 overflow-y-auto">
         {displayedPaths.map((feature) => {
           const isWalked = walkedPathIds.has(feature.id);
+          const isSelected = selectedPathId === feature.id;
           const isHovered = hoveredPathId === feature.id;
           return (
             <div
@@ -127,9 +130,11 @@ export default function PathList({
                 }
               }}
               className={`flex items-center gap-3 px-4 py-2 cursor-pointer ${
-                isHovered
-                  ? "bg-blue-50 dark:bg-blue-900/30"
-                  : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                isSelected
+                  ? "bg-orange-100 dark:bg-orange-900/50 ring-1 ring-inset ring-orange-300 dark:ring-orange-700"
+                  : isHovered
+                    ? "bg-blue-50 dark:bg-blue-900/30"
+                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
               }`}
               onClick={() => onPathClick(feature.id)}
               onMouseEnter={() => onPathHover(feature.id)}

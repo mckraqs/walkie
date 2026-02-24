@@ -38,8 +38,16 @@ export default function RegionExplorer({
   const [error, setError] = useState<string | null>(null);
   const [hoveredPathId, setHoveredPathId] = useState<number | null>(null);
   const [focusedPathId, setFocusedPathId] = useState<number | null>(null);
+  const [selectedPathId, setSelectedPathId] = useState<number | null>(null);
 
   const handleFocusHandled = useCallback(() => setFocusedPathId(null), []);
+
+  const handlePathClickFromList = useCallback((pathId: number) => {
+    setSelectedPathId(pathId);
+    setFocusedPathId(pathId);
+  }, []);
+
+  const handleDeselectPath = useCallback(() => setSelectedPathId(null), []);
 
   const handleGenerate = useCallback(
     async (distanceKm: number, routeType: RouteType) => {
@@ -104,8 +112,9 @@ export default function RegionExplorer({
         isFavorite={isFavorite}
         showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
+        selectedPathId={selectedPathId}
         onPathHover={setHoveredPathId}
-        onPathClick={setFocusedPathId}
+        onPathClick={handlePathClickFromList}
         onToggleWalk={handleToggleWalk}
       />
       <PathMap
@@ -119,6 +128,9 @@ export default function RegionExplorer({
         isFavorite={isFavorite}
         focusedPathId={focusedPathId}
         onFocusHandled={handleFocusHandled}
+        selectedPathId={selectedPathId}
+        onPathSelect={setSelectedPathId}
+        onDeselectPath={handleDeselectPath}
       />
     </div>
   );
