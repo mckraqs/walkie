@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -193,6 +193,19 @@ export default function PathMap({
   const hasRoute = route && route.segments.features.length > 0;
   const totalSegments = hasRoute ? route.segments.features.length : 0;
   const layerMapRef = useRef<Map<number, L.Path>>(new Map());
+  const mapRef = useRef<L.Map | null>(null);
+
+  function MapRefSetter() {
+    const map = useMap();
+    mapRef.current = map;
+    return null;
+  }
+
+  const pathFeatureMap = useMemo(() => {
+    const m = new Map<number, PathFeature>();
+    for (const f of paths.features) m.set(f.id, f);
+    return m;
+  }, [paths]);
 
   // Refs to avoid stale closures in onEachFeature callbacks
   const walkedPathIdsRef = useRef(walkedPathIds);
@@ -206,11 +219,12 @@ export default function PathMap({
   const [tooltipData, setTooltipData] = useState<{
     pathId: number;
     props: PathFeature["properties"];
+    fromTable?: boolean;
   } | null>(null);
   const tooltipPosRef = useRef({ x: 0, y: 0 });
   const tooltipElRef = useRef<HTMLDivElement>(null);
   const tooltipPinnedRef = useRef(false);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hoveredPathIdRef = useRef<number | null>(null);
 
   function getBaseStyle(pathId: number): PathOptions {
@@ -243,10 +257,25 @@ export default function PathMap({
     layer.setStyle(HOVER_STYLE);
     layer.bringToFront();
 
+    // Show tooltip at path center for hover originating from PathList (favorite only)
+    if (isFavorite && hoveredPathIdRef.current !== hoveredPathId && mapRef.current) {
+      const feature = pathFeatureMap.get(hoveredPathId);
+      if (feature) {
+        const center = L.geoJSON(feature.geometry).getBounds().getCenter();
+        const pt = mapRef.current.latLngToContainerPoint(center);
+        tooltipPosRef.current = { x: pt.x + 12, y: pt.y - 12 };
+        setTooltipData({ pathId: hoveredPathId, props: feature.properties, fromTable: true });
+      }
+    }
+
     return () => {
       layer.setStyle(getBaseStyle(hoveredPathId));
+      // Clear tooltip only if no active map hover and tooltip is not pinned
+      if (hoveredPathIdRef.current == null && !tooltipPinnedRef.current) {
+        setTooltipData(null);
+      }
     };
-  }, [hoveredPathId]);
+  }, [hoveredPathId, isFavorite, pathFeatureMap]);
 
   return (
     <div className="relative h-full w-full">
@@ -260,6 +289,7 @@ export default function PathMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds region={region} paths={paths} route={route} />
+        <MapRefSetter />
         {paths.features.length > 0 && (
           <GeoJSON
             key={`paths-${hasRoute ? "dimmed" : "normal"}`}
@@ -394,7 +424,7 @@ export default function PathMap({
           <div className="text-zinc-600 dark:text-zinc-400">
             Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
           </div>
-          {isFavorite && (
+          {isFavorite && !tooltipData.fromTable && (
             <label className="mt-1 flex cursor-pointer items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
               <input
                 type="checkbox"
