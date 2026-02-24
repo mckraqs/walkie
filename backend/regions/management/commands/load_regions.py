@@ -39,15 +39,26 @@ class Command(BaseCommand):
             action="store_true",
             help="Preview the load without writing to the database.",
         )
+        parser.add_argument(
+            "--update",
+            action="store_true",
+            help="Update administrative district fields on existing regions.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:  # noqa: ANN401
         """Execute the command."""
         csv_path = FilePath(options["csv_path"])
         batch_size: int = options["batch_size"]
         dry_run: bool = options["dry_run"]
+        update: bool = options["update"]
 
         self._validate_file(csv_path)
         rows = self._read_csv(csv_path)
+
+        if update:
+            self._update_districts(rows, batch_size, dry_run=dry_run)
+            return
+
         region_objects, skipped = self._build_region_objects(rows)
 
         if dry_run:
@@ -145,6 +156,59 @@ class Command(BaseCommand):
             )
 
         return region_objects, skipped
+
+    def _update_districts(
+        self,
+        rows: list[dict[str, str]],
+        batch_size: int,
+        *,
+        dry_run: bool,
+    ) -> None:
+        """Update administrative district fields on existing regions from CSV data."""
+        lookup: dict[str, tuple[str, str]] = {}
+        for row in rows:
+            code = row.get("region_code", "")
+            lvl1 = row.get("administrative_district_lvl_1", "")
+            lvl2 = row.get("administrative_district_lvl_2", "")
+            if code and (lvl1 or lvl2):
+                lookup[code] = (lvl1, lvl2)
+
+        regions = list(Region.objects.filter(code__in=lookup.keys()))
+        updated: list[Region] = []
+        for region in regions:
+            lvl1, lvl2 = lookup[region.code]
+            if (
+                region.administrative_district_lvl_1 != lvl1
+                or region.administrative_district_lvl_2 != lvl2
+            ):
+                region.administrative_district_lvl_1 = lvl1
+                region.administrative_district_lvl_2 = lvl2
+                updated.append(region)
+
+        if dry_run:
+            self.stdout.write(
+                f"[DRY RUN] Would update {len(updated)} regions "
+                f"({len(regions) - len(updated)} already up-to-date, "
+                f"{len(lookup) - len(regions)} codes not found in DB)."
+            )
+            return
+
+        update_fields = [
+            "administrative_district_lvl_1",
+            "administrative_district_lvl_2",
+        ]
+        with transaction.atomic():
+            Region.objects.bulk_update(
+                updated, fields=update_fields, batch_size=batch_size
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Updated {len(updated)} regions "
+                f"({len(regions) - len(updated)} already up-to-date, "
+                f"{len(lookup) - len(regions)} codes not found in DB)."
+            )
+        )
 
     def _bulk_insert(self, region_objects: list[Region], batch_size: int) -> None:
         """Insert all Region objects in batches inside a single transaction."""
