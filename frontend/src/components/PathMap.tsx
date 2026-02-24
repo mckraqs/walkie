@@ -29,6 +29,8 @@ interface PathMapProps {
   walkedPathIds?: Set<number>;
   onToggleWalk?: (pathId: number) => void;
   isFavorite?: boolean;
+  focusedPathId?: number | null;
+  onFocusHandled?: () => void;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -159,6 +161,34 @@ function RouteMarkers({ route }: { route: RouteResponse }) {
   );
 }
 
+function FitToPath({
+  focusedPathId,
+  paths,
+  onFocusHandled,
+}: {
+  focusedPathId: number | null | undefined;
+  paths: PathFeatureCollection;
+  onFocusHandled?: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (focusedPathId == null) return;
+
+    const feature = paths.features.find((f) => f.id === focusedPathId);
+    if (!feature) return;
+
+    const bounds = L.geoJSON(feature.geometry).getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+    }
+
+    onFocusHandled?.();
+  }, [map, focusedPathId, paths, onFocusHandled]);
+
+  return null;
+}
+
 function FitBounds({ region, paths, route }: PathMapProps) {
   const map = useMap();
 
@@ -188,6 +218,8 @@ export default function PathMap({
   onPathHover,
   walkedPathIds,
   isFavorite,
+  focusedPathId,
+  onFocusHandled,
 }: PathMapProps) {
   const hasRoute = route && route.segments.features.length > 0;
   const totalSegments = hasRoute ? route.segments.features.length : 0;
@@ -288,6 +320,7 @@ export default function PathMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds region={region} paths={paths} route={route} />
+        <FitToPath focusedPathId={focusedPathId} paths={paths} onFocusHandled={onFocusHandled} />
         <MapRefSetter />
         {paths.features.length > 0 && (
           <GeoJSON

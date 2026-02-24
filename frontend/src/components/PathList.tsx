@@ -23,6 +23,7 @@ interface PathListProps {
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
+  onPathClick: (pathId: number) => void;
   onToggleWalk: (pathId: number) => void;
 }
 
@@ -33,6 +34,7 @@ export default function PathList({
   showWalkedOnly,
   hoveredPathId,
   onPathHover,
+  onPathClick,
   onToggleWalk,
 }: PathListProps) {
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -129,6 +131,7 @@ export default function PathList({
                   ? "bg-blue-50 dark:bg-blue-900/30"
                   : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
               }`}
+              onClick={() => onPathClick(feature.id)}
               onMouseEnter={() => onPathHover(feature.id)}
               onMouseLeave={() => onPathHover(null)}
             >

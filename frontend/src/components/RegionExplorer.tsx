@@ -37,6 +37,9 @@ export default function RegionExplorer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredPathId, setHoveredPathId] = useState<number | null>(null);
+  const [focusedPathId, setFocusedPathId] = useState<number | null>(null);
+
+  const handleFocusHandled = useCallback(() => setFocusedPathId(null), []);
 
   const handleGenerate = useCallback(
     async (distanceKm: number, routeType: RouteType) => {
@@ -102,6 +105,7 @@ export default function RegionExplorer({
         showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
+        onPathClick={setFocusedPathId}
         onToggleWalk={handleToggleWalk}
       />
       <PathMap
@@ -113,6 +117,8 @@ export default function RegionExplorer({
         walkedPathIds={walkedPathIds}
         onToggleWalk={handleToggleWalk}
         isFavorite={isFavorite}
+        focusedPathId={focusedPathId}
+        onFocusHandled={handleFocusHandled}
       />
     </div>
   );
