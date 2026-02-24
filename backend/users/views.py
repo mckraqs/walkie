@@ -12,9 +12,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from paths.models import Path
 from regions.models import Region
 from regions.serializers import RegionListItemSerializer
-from users.models import FavoriteRegion
+from users.models import FavoriteRegion, PathWalkAction, PathWalkLog
 from users.serializers import LoginSerializer, UserSerializer
 
 
@@ -149,3 +150,106 @@ class FavoriteRegionToggleView(APIView):
         if not deleted:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _get_walked_path_ids(user: object, region: Region) -> list[int]:
+    """Return the IDs of paths currently marked as walked by the user in a region.
+
+    Uses DISTINCT ON to get the latest log entry per path, then filters for
+    the "walked" action to determine the current state.
+
+    Args:
+        user: The authenticated user.
+        region: The region to query.
+
+    Returns:
+        Sorted list of path IDs currently marked as walked.
+    """
+    latest_logs = (
+        PathWalkLog.objects.filter(user=user, region=region)
+        .order_by("path_id", "-created_at")
+        .distinct("path_id")
+    )
+    walked_ids = [
+        log.path_id for log in latest_logs if log.action == PathWalkAction.WALKED
+    ]
+    return sorted(walked_ids)
+
+
+class WalkedPathsListView(APIView):
+    """Return paths the user has currently marked as walked in a region."""
+
+    def get(self, request: Request, region_id: int) -> Response:
+        """Handle GET to return walked path IDs for a region.
+
+        Args:
+            request: The authenticated HTTP request.
+            region_id: The region primary key.
+
+        Returns:
+            200 with walked_path_ids and total_paths, or 403/404.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        walked_path_ids = _get_walked_path_ids(request.user, region)
+        total_paths = Path.objects.filter(region=region).count()
+        return Response(
+            {"walked_path_ids": walked_path_ids, "total_paths": total_paths},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PathWalkToggleView(APIView):
+    """Toggle the walked state for a path within a region."""
+
+    def post(self, request: Request, region_id: int, path_id: int) -> Response:
+        """Handle POST to toggle the walked state of a path.
+
+        Args:
+            request: The authenticated HTTP request.
+            region_id: The region primary key.
+            path_id: The path primary key.
+
+        Returns:
+            200 with updated state, or 403/404.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        path = get_object_or_404(Path, pk=path_id, region=region)
+
+        latest_log = (
+            PathWalkLog.objects.filter(user=request.user, path=path)
+            .order_by("-created_at")
+            .first()
+        )
+        if latest_log is None or latest_log.action == PathWalkAction.UNWALKED:
+            new_action = PathWalkAction.WALKED
+        else:
+            new_action = PathWalkAction.UNWALKED
+
+        PathWalkLog.objects.create(
+            user=request.user,
+            path=path,
+            region=region,
+            action=new_action,
+        )
+
+        walked_path_ids = _get_walked_path_ids(request.user, region)
+        total_paths = Path.objects.filter(region=region).count()
+        return Response(
+            {
+                "path_id": path.pk,
+                "action": new_action,
+                "walked_path_ids": walked_path_ids,
+                "total_paths": total_paths,
+            },
+            status=status.HTTP_200_OK,
+        )

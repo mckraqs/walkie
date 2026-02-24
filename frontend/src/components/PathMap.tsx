@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -24,6 +24,11 @@ interface PathMapProps {
   region: RegionFeature;
   paths: PathFeatureCollection;
   route?: RouteResponse | null;
+  hoveredPathId?: number | null;
+  onPathHover?: (pathId: number | null) => void;
+  walkedPathIds?: Set<number>;
+  onToggleWalk?: (pathId: number) => void;
+  isFavorite?: boolean;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -42,6 +47,12 @@ const HOVER_STYLE: PathOptions = {
   color: "#1d4ed8",
   weight: 5,
   opacity: 1,
+};
+
+const WALKED_STYLE: PathOptions = {
+  color: "#22c55e",
+  weight: 3,
+  opacity: 0.8,
 };
 
 const ROUTE_HOVER_STYLE: PathOptions = {
@@ -74,16 +85,6 @@ function getSegmentColor(sequenceIndex: number, total: number): string {
   return interpolateColor(COLOR_MID, COLOR_END, (t - 0.5) * 2);
 }
 
-function buildTooltip(props: PathFeature["properties"]): string {
-  return [
-    `<strong>${props.name || "Unnamed"}</strong>`,
-    `Category: ${props.category}`,
-    `Surface: ${props.surface || "unknown"}`,
-    `Accessible: ${props.accessible ? "Yes" : "No"}`,
-    `Lit: ${props.is_lit ? "Yes" : "No"}`,
-  ].join("<br>");
-}
-
 function buildRouteTooltip(
   props: PathFeature["properties"],
   total: number,
@@ -104,7 +105,6 @@ function RouteMarkers({ route }: { route: RouteResponse }) {
 
   if (!start_point || !end_point) return null;
 
-  // Points from backend are [lon, lat]; Leaflet needs [lat, lon]
   const startLatLng: [number, number] = [start_point[1], start_point[0]];
   const endLatLng: [number, number] = [end_point[1], end_point[0]];
 
@@ -180,82 +180,233 @@ function FitBounds({ region, paths, route }: PathMapProps) {
   return null;
 }
 
-export default function PathMap({ region, paths, route }: PathMapProps) {
+export default function PathMap({
+  region,
+  paths,
+  route,
+  hoveredPathId,
+  onPathHover,
+  walkedPathIds,
+  onToggleWalk,
+  isFavorite,
+}: PathMapProps) {
   const hasRoute = route && route.segments.features.length > 0;
-  const baseStyle = hasRoute ? PATH_DIMMED_STYLE : PATH_STYLE;
-  const baseHoverStyle = hasRoute ? PATH_DIMMED_STYLE : HOVER_STYLE;
   const totalSegments = hasRoute ? route.segments.features.length : 0;
+  const layerMapRef = useRef<Map<number, L.Path>>(new Map());
+
+  // Refs to avoid stale closures in onEachFeature callbacks
+  const walkedPathIdsRef = useRef(walkedPathIds);
+  walkedPathIdsRef.current = walkedPathIds;
+  const hasRouteRef = useRef(hasRoute);
+  hasRouteRef.current = hasRoute;
+  const onPathHoverRef = useRef(onPathHover);
+  onPathHoverRef.current = onPathHover;
+
+  // Tooltip state
+  const [tooltipData, setTooltipData] = useState<{
+    pathId: number;
+    props: PathFeature["properties"];
+  } | null>(null);
+  const tooltipPosRef = useRef({ x: 0, y: 0 });
+  const tooltipElRef = useRef<HTMLDivElement>(null);
+  const tooltipPinnedRef = useRef(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hoveredPathIdRef = useRef<number | null>(null);
+
+  function getBaseStyle(pathId: number): PathOptions {
+    if (hasRouteRef.current) return PATH_DIMMED_STYLE;
+    if (walkedPathIdsRef.current?.has(pathId)) return WALKED_STYLE;
+    return PATH_STYLE;
+  }
+
+  function getHoverStyle(): PathOptions {
+    if (hasRouteRef.current) return PATH_DIMMED_STYLE;
+    return HOVER_STYLE;
+  }
+
+  // Imperative style update when walkedPathIds changes
+  useEffect(() => {
+    layerMapRef.current.forEach((layer, pathId) => {
+      if (pathId !== hoveredPathId) {
+        layer.setStyle(getBaseStyle(pathId));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walkedPathIds, hasRoute]);
+
+  // External hover (from PathList) drives style
+  useEffect(() => {
+    if (hoveredPathId == null) return;
+    const layer = layerMapRef.current.get(hoveredPathId);
+    if (!layer) return;
+
+    layer.setStyle(HOVER_STYLE);
+    layer.bringToFront();
+
+    return () => {
+      layer.setStyle(getBaseStyle(hoveredPathId));
+    };
+  }, [hoveredPathId]);
 
   return (
-    <MapContainer
-      center={[51.4, 21.1]}
-      zoom={12}
-      className="h-full w-full"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <FitBounds region={region} paths={paths} route={route} />
-      {paths.features.length > 0 && (
-        <GeoJSON
-          key={`paths-${hasRoute ? "dimmed" : "normal"}`}
-          data={paths}
-          style={() => baseStyle}
-          onEachFeature={(feature, layer: Layer) => {
-            const props = (feature as PathFeature).properties;
-            layer.bindTooltip(buildTooltip(props), { sticky: true });
-            layer.on({
-              mouseover: (e) => {
-                (e.target as L.Path).setStyle(baseHoverStyle);
-              },
-              mouseout: (e) => {
-                (e.target as L.Path).setStyle(baseStyle);
-              },
-            });
-          }}
+    <div className="relative h-full w-full">
+      <MapContainer
+        center={[51.4, 21.1]}
+        zoom={12}
+        className="h-full w-full"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-      )}
-      {hasRoute && (
-        <>
+        <FitBounds region={region} paths={paths} route={route} />
+        {paths.features.length > 0 && (
           <GeoJSON
-            key={`route-${route.total_distance}`}
-            data={route.segments}
+            key={`paths-${hasRoute ? "dimmed" : "normal"}`}
+            data={paths}
             style={(feature) => {
-              const props = (feature as PathFeature | undefined)?.properties;
-              const seqIdx = props?.sequence_index ?? 0;
-              const color = getSegmentColor(seqIdx, totalSegments);
-              return {
-                color,
-                weight: 5,
-                opacity: 0.9,
-              };
+              const pathId = (feature as PathFeature).id;
+              return getBaseStyle(pathId);
             }}
             onEachFeature={(feature, layer: Layer) => {
-              const props = (feature as PathFeature).properties;
-              const seqIdx = props.sequence_index ?? 0;
-              const segmentColor = getSegmentColor(seqIdx, totalSegments);
-              layer.bindTooltip(
-                buildRouteTooltip(props, totalSegments),
-                { sticky: true },
-              );
+              const pathFeature = feature as PathFeature;
+              const pathId = pathFeature.id;
+              const props = pathFeature.properties;
+
+              layerMapRef.current.set(pathId, layer as L.Path);
+
               layer.on({
                 mouseover: (e) => {
-                  (e.target as L.Path).setStyle(ROUTE_HOVER_STYLE);
+                  clearTimeout(hideTimerRef.current);
+                  const containerPoint = (
+                    e as L.LeafletMouseEvent
+                  ).containerPoint;
+                  tooltipPosRef.current = {
+                    x: containerPoint.x + 12,
+                    y: containerPoint.y - 12,
+                  };
+                  hoveredPathIdRef.current = pathId;
+                  setTooltipData({ pathId, props });
+                  (e.target as L.Path).setStyle(getHoverStyle());
+                  onPathHoverRef.current?.(pathId);
+                },
+                mousemove: (e) => {
+                  if (!tooltipPinnedRef.current && tooltipElRef.current) {
+                    const containerPoint = (
+                      e as L.LeafletMouseEvent
+                    ).containerPoint;
+                    const x = containerPoint.x + 12;
+                    const y = containerPoint.y - 12;
+                    tooltipPosRef.current = { x, y };
+                    tooltipElRef.current.style.left = `${x}px`;
+                    tooltipElRef.current.style.top = `${y}px`;
+                  }
                 },
                 mouseout: (e) => {
-                  (e.target as L.Path).setStyle({
-                    color: segmentColor,
-                    weight: 5,
-                    opacity: 0.9,
-                  });
+                  (e.target as L.Path).setStyle(getBaseStyle(pathId));
+                  hoveredPathIdRef.current = null;
+                  onPathHoverRef.current?.(null);
+                  hideTimerRef.current = setTimeout(() => {
+                    if (!tooltipPinnedRef.current) {
+                      setTooltipData(null);
+                    }
+                  }, 150);
                 },
               });
             }}
           />
-          <RouteMarkers route={route} />
-        </>
+        )}
+        {hasRoute && (
+          <>
+            <GeoJSON
+              key={`route-${route.total_distance}`}
+              data={route.segments}
+              style={(feature) => {
+                const props = (feature as PathFeature | undefined)?.properties;
+                const seqIdx = props?.sequence_index ?? 0;
+                const color = getSegmentColor(seqIdx, totalSegments);
+                return {
+                  color,
+                  weight: 5,
+                  opacity: 0.9,
+                };
+              }}
+              onEachFeature={(feature, layer: Layer) => {
+                const props = (feature as PathFeature).properties;
+                const seqIdx = props.sequence_index ?? 0;
+                const segmentColor = getSegmentColor(seqIdx, totalSegments);
+                layer.bindTooltip(
+                  buildRouteTooltip(props, totalSegments),
+                  { sticky: true },
+                );
+                layer.on({
+                  mouseover: (e) => {
+                    (e.target as L.Path).setStyle(ROUTE_HOVER_STYLE);
+                  },
+                  mouseout: (e) => {
+                    (e.target as L.Path).setStyle({
+                      color: segmentColor,
+                      weight: 5,
+                      opacity: 0.9,
+                    });
+                  },
+                });
+              }}
+            />
+            <RouteMarkers route={route} />
+          </>
+        )}
+      </MapContainer>
+      {tooltipData && (
+        <div
+          ref={tooltipElRef}
+          className="pointer-events-auto absolute z-[1001] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+          style={{
+            left: tooltipPosRef.current.x,
+            top: tooltipPosRef.current.y,
+          }}
+          onMouseEnter={() => {
+            tooltipPinnedRef.current = true;
+            clearTimeout(hideTimerRef.current);
+          }}
+          onMouseLeave={() => {
+            tooltipPinnedRef.current = false;
+            if (hoveredPathIdRef.current == null) {
+              hideTimerRef.current = setTimeout(
+                () => setTooltipData(null),
+                150,
+              );
+            }
+          }}
+        >
+          <strong className="text-zinc-900 dark:text-zinc-100">
+            {tooltipData.props.name || "Unnamed"}
+          </strong>
+          <div className="text-zinc-600 dark:text-zinc-400">
+            Category: {tooltipData.props.category}
+          </div>
+          <div className="text-zinc-600 dark:text-zinc-400">
+            Surface: {tooltipData.props.surface || "unknown"}
+          </div>
+          <div className="text-zinc-600 dark:text-zinc-400">
+            Accessible: {tooltipData.props.accessible ? "Yes" : "No"}
+          </div>
+          <div className="text-zinc-600 dark:text-zinc-400">
+            Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
+          </div>
+          {isFavorite && (
+            <label className="mt-1 flex cursor-pointer items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+              <input
+                type="checkbox"
+                className="accent-green-500"
+                checked={walkedPathIds?.has(tooltipData.pathId) ?? false}
+                onChange={() => onToggleWalk?.(tooltipData.pathId)}
+              />
+              Walked
+            </label>
+          )}
+        </div>
       )}
-    </MapContainer>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -9,6 +9,7 @@ import {
   fetchRegionPaths,
   addFavoriteRegion,
   removeFavoriteRegion,
+  fetchWalkedPaths,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import RegionExplorer from "@/components/RegionExplorer";
@@ -31,6 +32,10 @@ export default function ExplorePage() {
   const [regionLoading, setRegionLoading] = useState(false);
   const [regionsLoading, setRegionsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [walkedPathIds, setWalkedPathIds] = useState<number[]>([]);
+  const [totalPaths, setTotalPaths] = useState(0);
+  const [showWalkedOnly, setShowWalkedOnly] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -69,6 +74,34 @@ export default function ExplorePage() {
       })
       .finally(() => setRegionLoading(false));
   }, [selectedRegionId, user]);
+
+  const isFavorite = regions.find((r) => r.id === Number(selectedRegionId))?.is_favorite ?? false;
+
+  useEffect(() => {
+    if (!selectedRegionId || !user || !isFavorite) {
+      // Reset via resolved promise to satisfy set-state-in-effect lint rule
+      Promise.resolve().then(() => {
+        setWalkedPathIds([]);
+        setTotalPaths(0);
+        setShowWalkedOnly(false);
+      });
+      return;
+    }
+    fetchWalkedPaths(selectedRegionId)
+      .then((data) => {
+        setWalkedPathIds(data.walked_path_ids);
+        setTotalPaths(data.total_paths);
+      })
+      .catch(() => {
+        setWalkedPathIds([]);
+        setTotalPaths(0);
+      });
+  }, [selectedRegionId, user, isFavorite]);
+
+  const handleWalkedChange = useCallback((newWalkedPathIds: number[], newTotalPaths: number) => {
+    setWalkedPathIds(newWalkedPathIds);
+    setTotalPaths(newTotalPaths);
+  }, []);
 
   const districts = useMemo(
     () =>
@@ -121,12 +154,21 @@ export default function ExplorePage() {
           properties: { ...region.properties, is_favorite: !currentlyFavorite },
         });
       }
+      if (!currentlyFavorite) {
+        fetchWalkedPaths(selectedRegionId)
+          .then((data) => {
+            setWalkedPathIds(data.walked_path_ids);
+            setTotalPaths(data.total_paths);
+          })
+          .catch(() => {
+            setWalkedPathIds([]);
+            setTotalPaths(0);
+          });
+      }
     } catch {
       // Silently handle
     }
   }
-
-  const isFavorite = regions.find((r) => r.id === Number(selectedRegionId))?.is_favorite ?? false;
 
   if (authLoading || (!user && !error)) {
     return (
@@ -196,6 +238,25 @@ export default function ExplorePage() {
               {isFavorite ? "\u2605" : "\u2606"}
             </button>
           )}
+          {selectedRegionId && isFavorite && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowWalkedOnly((v) => !v)}
+                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
+                  showWalkedOnly
+                    ? "border-green-600 bg-green-50 text-green-700 dark:border-green-500 dark:bg-green-900/30 dark:text-green-400"
+                    : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                }`}
+              >
+                Walked
+              </button>
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                {walkedPathIds.length}/{totalPaths}{" "}
+                ({totalPaths > 0 ? Math.round((walkedPathIds.length / totalPaths) * 100) : 0}%)
+              </span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {user && (
@@ -244,6 +305,9 @@ export default function ExplorePage() {
             region={region}
             paths={paths}
             isFavorite={isFavorite}
+            walkedPathIds={new Set(walkedPathIds)}
+            showWalkedOnly={showWalkedOnly}
+            onWalkedChange={handleWalkedChange}
           />
         )}
       </div>

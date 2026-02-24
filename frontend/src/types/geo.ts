@@ -78,3 +78,15 @@ export interface RouteResponse {
   paths_count: number;
   path_names: string[];
 }
+
+export interface WalkedPathsResponse {
+  walked_path_ids: number[];
+  total_paths: number;
+}
+
+export interface PathWalkToggleResponse {
+  path_id: number;
+  action: "walked" | "unwalked";
+  walked_path_ids: number[];
+  total_paths: number;
+}
