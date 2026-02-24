@@ -1,7 +1,20 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import type { PathFeatureCollection } from "@/types/geo";
+
+function fuzzyMatch(query: string, target: string): boolean {
+  if (query === "") return true;
+  const lowerQuery = query.toLowerCase();
+  const lowerTarget = target.toLowerCase();
+  let qi = 0;
+  for (let ti = 0; ti < lowerTarget.length && qi < lowerQuery.length; ti++) {
+    if (lowerTarget[ti] === lowerQuery[qi]) {
+      qi++;
+    }
+  }
+  return qi === lowerQuery.length;
+}
 
 interface PathListProps {
   paths: PathFeatureCollection;
@@ -23,6 +36,7 @@ export default function PathList({
   onToggleWalk,
 }: PathListProps) {
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (hoveredPathId == null) return;
@@ -32,9 +46,17 @@ export default function PathList({
     }
   }, [hoveredPathId]);
 
-  const displayedPaths = showWalkedOnly
-    ? paths.features.filter((f) => walkedPathIds.has(f.id))
-    : paths.features;
+  const displayedPaths = useMemo(() => {
+    let filtered = showWalkedOnly
+      ? paths.features.filter((f) => walkedPathIds.has(f.id))
+      : paths.features;
+    if (searchQuery) {
+      filtered = filtered.filter((f) =>
+        fuzzyMatch(searchQuery, f.properties.name ?? ""),
+      );
+    }
+    return filtered;
+  }, [paths.features, walkedPathIds, showWalkedOnly, searchQuery]);
 
   return (
     <div className="absolute right-4 top-4 z-[1000] flex w-72 max-h-[calc(100vh-8rem)] flex-col rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
@@ -43,6 +65,34 @@ export default function PathList({
           Paths ({displayedPaths.length})
         </h2>
       </div>
+      {isFavorite && (
+        <div className="border-b border-zinc-200 px-4 py-2 dark:border-zinc-700">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search paths..."
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-blue-400 dark:focus:ring-blue-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto">
         {displayedPaths.map((feature) => {
           const isWalked = walkedPathIds.has(feature.id);
