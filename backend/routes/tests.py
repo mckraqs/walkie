@@ -9,6 +9,7 @@ from rest_framework.test import APIClient
 
 from paths.models import Path, PathSegment, Segment
 from regions.models import Region
+from routes.models import Route
 from routes.services import (
     RouteGenerationError,
     RouteType,
@@ -682,3 +683,408 @@ class TestBuildPenalizedEdgesSql:
             rows = cursor.fetchall()
 
         assert len(rows) > 0
+
+
+def _create_saved_route(
+    user: User,
+    region: Region,
+    *,
+    name: str = "Morning Walk",
+    segment_ids: list[int] | None = None,
+) -> Route:
+    """Create a saved Route for testing."""
+    if segment_ids is None:
+        segment_ids = list(
+            Segment.objects.filter(region=region)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+    return Route.objects.create(
+        user=user,
+        region=region,
+        name=name,
+        segment_ids=segment_ids,
+        total_distance=500.0,
+        is_loop=False,
+        start_point=[20.0, 50.0],
+        end_point=[20.001, 50.0],
+    )
+
+
+@pytest.mark.django_db
+class TestRouteModel:
+    """Tests for the Route model."""
+
+    def test_create_route(
+        self,
+        region_with_topology: Region,
+        user: User,
+    ) -> None:
+        """Route can be created with all required fields."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology).values_list(
+                "pk", flat=True
+            )[:2]
+        )
+        route = Route.objects.create(
+            user=user,
+            region=region_with_topology,
+            name="Test Route",
+            segment_ids=segment_ids,
+            total_distance=350.0,
+            is_loop=False,
+            start_point=[20.0, 50.0],
+            end_point=[20.001, 50.0],
+        )
+
+        assert route.pk is not None
+        assert route.name == "Test Route"
+        assert route.segment_ids == segment_ids
+        assert route.total_distance == 350.0
+        assert route.is_loop is False
+        assert route.created_at is not None
+
+    def test_ordering_is_newest_first(
+        self,
+        region_with_topology: Region,
+        user: User,
+    ) -> None:
+        """Routes are ordered by -created_at by default."""
+        r1 = _create_saved_route(user, region_with_topology, name="First")
+        r2 = _create_saved_route(user, region_with_topology, name="Second")
+
+        routes = list(Route.objects.filter(user=user))
+        assert routes[0].pk == r2.pk
+        assert routes[1].pk == r1.pk
+
+    def test_str_representation(
+        self,
+        region_with_topology: Region,
+        user: User,
+    ) -> None:
+        """__str__ returns name and user."""
+        route = _create_saved_route(user, region_with_topology)
+        assert user.username in str(route)
+        assert route.name in str(route)
+
+
+@pytest.mark.django_db
+class TestRouteListCreateView:
+    """Tests for the saved routes list/create endpoint."""
+
+    def test_list_empty(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """GET returns empty list when no saved routes exist."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_returns_user_routes(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """GET returns saved routes belonging to the authenticated user."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        _create_saved_route(user, region_with_topology, name="Walk A")
+        _create_saved_route(user, region_with_topology, name="Walk B")
+
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        names = {r["name"] for r in data}
+        assert names == {"Walk A", "Walk B"}
+        for item in data:
+            assert "id" in item
+            assert "total_distance" in item
+            assert "is_loop" in item
+            assert "created_at" in item
+
+    def test_create_route_success(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST creates a route and returns 201 with route summary."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology).values_list(
+                "pk", flat=True
+            )[:2]
+        )
+
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "New Route",
+                "segment_ids": segment_ids,
+                "total_distance": 420.0,
+                "is_loop": False,
+                "start_point": [20.0, 50.0],
+                "end_point": [20.001, 50.0],
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "New Route"
+        assert data["total_distance"] == 420.0
+        assert data["is_loop"] is False
+        assert "id" in data
+        assert "created_at" in data
+
+    def test_create_route_non_favorite_returns_403(
+        self,
+        region_with_topology: Region,
+        auth_client: APIClient,
+    ) -> None:
+        """POST returns 403 when region is not a favorite."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology).values_list(
+                "pk", flat=True
+            )[:2]
+        )
+
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "Route",
+                "segment_ids": segment_ids,
+                "total_distance": 100.0,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 403
+
+    def test_create_route_invalid_segment_ids(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST returns 400 when segment IDs don't belong to the region."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "Bad Route",
+                "segment_ids": [999999, 999998],
+                "total_distance": 100.0,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "segment" in response.json()["detail"].lower()
+
+    def test_create_route_limit_returns_409(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST returns 409 when the 25-route-per-region limit is reached."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology).values_list(
+                "pk", flat=True
+            )[:2]
+        )
+        for i in range(25):
+            Route.objects.create(
+                user=user,
+                region=region_with_topology,
+                name=f"Route {i}",
+                segment_ids=segment_ids,
+                total_distance=100.0,
+            )
+
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "One Too Many",
+                "segment_ids": segment_ids,
+                "total_distance": 100.0,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 409
+
+    def test_list_non_favorite_returns_403(
+        self,
+        region_with_topology: Region,
+        auth_client: APIClient,
+    ) -> None:
+        """GET returns 403 when region is not a favorite."""
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+        )
+
+        assert response.status_code == 403
+
+    def test_unauthenticated_returns_401(
+        self,
+        region_with_topology: Region,
+    ) -> None:
+        """401 for unauthenticated access."""
+        client = APIClient()
+        response = client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+        )
+
+        assert response.status_code == 401
+
+    def test_user_isolation(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """User cannot see routes saved by another user."""
+        other_user = User.objects.create_user(
+            username="otheruser", password="otherpass123"
+        )
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        FavoriteRegion.objects.create(user=other_user, region=region_with_topology)
+        _create_saved_route(other_user, region_with_topology, name="Other Route")
+
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+
+@pytest.mark.django_db
+class TestRouteDetailView:
+    """Tests for the saved route detail endpoint."""
+
+    def test_get_route_detail(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """GET returns full route data matching RouteGenerateView shape."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_distance" in data
+        assert "is_loop" in data
+        assert "start_point" in data
+        assert "end_point" in data
+        assert "segments" in data
+        assert "paths_count" in data
+        assert "path_names" in data
+        assert data["segments"]["type"] == "FeatureCollection"
+
+    def test_get_route_non_favorite_returns_403(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """GET returns 403 when region is not a favorite."""
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+        )
+
+        assert response.status_code == 403
+
+    def test_get_other_users_route_returns_404(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """GET returns 404 when trying to access another user's route."""
+        other_user = User.objects.create_user(
+            username="otheruser2", password="otherpass123"
+        )
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(other_user, region_with_topology)
+
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+        )
+
+        assert response.status_code == 404
+
+    def test_delete_route(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """DELETE removes the route and returns 204."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.delete(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+        )
+
+        assert response.status_code == 204
+        assert not Route.objects.filter(pk=route.pk).exists()
+
+    def test_delete_other_users_route_returns_404(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """DELETE returns 404 when trying to delete another user's route."""
+        other_user = User.objects.create_user(
+            username="otheruser3", password="otherpass123"
+        )
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(other_user, region_with_topology)
+
+        response = auth_client.delete(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+        )
+
+        assert response.status_code == 404
+        assert Route.objects.filter(pk=route.pk).exists()
+
+    def test_delete_non_favorite_returns_403(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """DELETE returns 403 when region is not a favorite."""
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.delete(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+        )
+
+        assert response.status_code == 403

@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { generateRoute, togglePathWalk } from "@/lib/api";
+import {
+  generateRoute,
+  togglePathWalk,
+  saveRoute,
+  fetchSavedRoutes,
+  loadRoute,
+  deleteRoute,
+} from "@/lib/api";
 import RoutePlanner from "@/components/RoutePlanner";
 import PlaceNameDialog from "@/components/PlaceNameDialog";
 import PathList from "@/components/PathList";
@@ -11,6 +18,8 @@ import type {
   PathFeatureCollection,
   RouteResponse,
   RouteType,
+  RouteListItem,
+  SaveRouteRequest,
   Place,
 } from "@/types/geo";
 
@@ -57,6 +66,49 @@ export default function RegionExplorer({
   const [hoveredPathId, setHoveredPathId] = useState<number | null>(null);
   const [focusedPathId, setFocusedPathId] = useState<number | null>(null);
   const [selectedPathId, setSelectedPathId] = useState<number | null>(null);
+  const [savedRoutes, setSavedRoutes] = useState<RouteListItem[]>([]);
+
+  useEffect(() => {
+    if (!isFavorite) return;
+    fetchSavedRoutes(regionId)
+      .then(setSavedRoutes)
+      .catch(() => {});
+  }, [regionId, isFavorite]);
+
+  const handleSaveRoute = useCallback(
+    async (request: SaveRouteRequest) => {
+      const saved = await saveRoute(regionId, request);
+      setSavedRoutes((prev) => [saved, ...prev]);
+    },
+    [regionId],
+  );
+
+  const handleLoadRoute = useCallback(
+    async (routeId: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await loadRoute(regionId, routeId);
+        setRoute(result);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load route",
+        );
+        setRoute(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [regionId],
+  );
+
+  const handleDeleteRoute = useCallback(
+    async (routeId: number) => {
+      await deleteRoute(regionId, routeId);
+      setSavedRoutes((prev) => prev.filter((r) => r.id !== routeId));
+    },
+    [regionId],
+  );
 
   const handleFocusHandled = useCallback(() => setFocusedPathId(null), []);
 
@@ -126,6 +178,10 @@ export default function RegionExplorer({
         onClear={handleClear}
         isFavorite={isFavorite}
         places={places}
+        savedRoutes={savedRoutes}
+        onSaveRoute={handleSaveRoute}
+        onLoadRoute={handleLoadRoute}
+        onDeleteRoute={handleDeleteRoute}
       />
       <PathList
         paths={displayedPaths}

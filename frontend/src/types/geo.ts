@@ -110,3 +110,20 @@ export interface PlaceUpdateRequest {
   name?: string;
   location?: [number, number];
 }
+
+export interface RouteListItem {
+  id: number;
+  name: string;
+  total_distance: number;
+  is_loop: boolean;
+  created_at: string;
+}
+
+export interface SaveRouteRequest {
+  name: string;
+  segment_ids: number[];
+  total_distance: number;
+  is_loop: boolean;
+  start_point: [number, number] | null;
+  end_point: [number, number] | null;
+}

@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import type { RouteResponse, RouteType, Place } from "@/types/geo";
+import { useEffect, useState } from "react";
+import type {
+  RouteResponse,
+  RouteType,
+  RouteListItem,
+  SaveRouteRequest,
+  Place,
+} from "@/types/geo";
 
 interface RoutePlannerProps {
   route: RouteResponse | null;
@@ -11,6 +17,10 @@ interface RoutePlannerProps {
   onClear: () => void;
   isFavorite: boolean;
   places?: Place[];
+  savedRoutes: RouteListItem[];
+  onSaveRoute: (request: SaveRouteRequest) => Promise<void>;
+  onLoadRoute: (routeId: number) => void;
+  onDeleteRoute: (routeId: number) => Promise<void>;
 }
 
 function formatDistance(meters: number): string {
@@ -28,12 +38,25 @@ export default function RoutePlanner({
   onClear,
   isFavorite,
   places,
+  savedRoutes,
+  onSaveRoute,
+  onLoadRoute,
+  onDeleteRoute,
 }: RoutePlannerProps) {
   const [collapsed, setCollapsed] = useState(true);
   const [distance, setDistance] = useState("3");
   const [routeType, setRouteType] = useState<RouteType>("one_way");
   const [startPlaceId, setStartPlaceId] = useState<number | null>(null);
   const [endPlaceId, setEndPlaceId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [routeName, setRouteName] = useState("");
+
+  useEffect(() => {
+    setShowSaveInput(false);
+    setSaveError(null);
+  }, [route]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -172,6 +195,56 @@ export default function RoutePlanner({
           )}
         </form>
 
+        {isFavorite && savedRoutes.length > 0 && (
+          <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-700">
+            <label
+              htmlFor="saved-routes"
+              className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              Saved Routes
+            </label>
+            <div className="flex gap-1">
+              <select
+                id="saved-routes"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onLoadRoute(Number(e.target.value));
+                    e.target.value = "";
+                  }
+                }}
+                disabled={loading}
+                className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+              >
+                <option value="" disabled>
+                  Load a saved route...
+                </option>
+                {savedRoutes.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} ({formatDistance(r.total_distance)}
+                    {r.is_loop ? ", loop" : ""})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  const select = document.getElementById("saved-routes") as HTMLSelectElement | null;
+                  const routeId = select?.value ? Number(select.value) : null;
+                  if (routeId) {
+                    onDeleteRoute(routeId);
+                    select!.value = "";
+                  }
+                }}
+                className="rounded border border-red-300 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
+                title="Delete selected route"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
         )}
@@ -209,6 +282,82 @@ export default function RoutePlanner({
             >
               Clear Route
             </button>
+            {isFavorite && !showSaveInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  const names = route.path_names;
+                  const defaultName =
+                    names.length > 1
+                      ? `${names[0]} -> ${names[names.length - 1]}`
+                      : names.length === 1
+                        ? names[0]
+                        : "My Route";
+                  setRouteName(defaultName);
+                  setShowSaveInput(true);
+                  setSaveError(null);
+                }}
+                className="mt-1 w-full rounded border border-blue-300 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30"
+              >
+                Save Route
+              </button>
+            )}
+            {showSaveInput && (
+              <div className="mt-2 space-y-1">
+                <input
+                  type="text"
+                  value={routeName}
+                  onChange={(e) => setRouteName(e.target.value)}
+                  disabled={saving}
+                  placeholder="Route name"
+                  className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={saving || !routeName.trim()}
+                    onClick={async () => {
+                      setSaving(true);
+                      setSaveError(null);
+                      try {
+                        await onSaveRoute({
+                          name: routeName.trim(),
+                          segment_ids: route.segments.features.map((f) => f.id),
+                          total_distance: route.total_distance,
+                          is_loop: route.is_loop,
+                          start_point: route.start_point,
+                          end_point: route.end_point,
+                        });
+                        setShowSaveInput(false);
+                      } catch (err) {
+                        setSaveError(
+                          err instanceof Error ? err.message : "Failed to save route",
+                        );
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    className="flex-1 rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? "..." : "Confirm"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSaveInput(false);
+                      setSaveError(null);
+                    }}
+                    disabled={saving}
+                    className="flex-1 rounded border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {saveError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{saveError}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

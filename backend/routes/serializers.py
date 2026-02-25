@@ -42,3 +42,41 @@ class RouteSegmentSerializer(GeoFeatureModelSerializer):
             "created_at",
             "sequence_index",
         )
+
+
+class RouteCreateSerializer(serializers.Serializer):
+    """Validate a saved route creation request."""
+
+    name = serializers.CharField(max_length=255)
+    segment_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=1,
+    )
+    total_distance = serializers.FloatField(min_value=0)
+    is_loop = serializers.BooleanField(default=False)
+    start_point = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=2,
+        max_length=2,
+        required=False,
+        default=None,
+        allow_null=True,
+    )
+    end_point = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=2,
+        max_length=2,
+        required=False,
+        default=None,
+        allow_null=True,
+    )
+
+
+class RouteListItemSerializer(serializers.Serializer):
+    """Serialize a saved route for list responses."""
+
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    total_distance = serializers.FloatField(read_only=True)
+    is_loop = serializers.BooleanField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)

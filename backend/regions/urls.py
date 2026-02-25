@@ -5,7 +5,7 @@ from django.urls import path
 from paths.views import RegionPathsListView
 from places.views import PlaceDetailView, PlaceListCreateView
 from regions.views import RegionDetailView, RegionListView
-from routes.views import RouteGenerateView
+from routes.views import RouteDetailView, RouteGenerateView, RouteListCreateView
 from users.views import (
     FavoriteRegionListView,
     FavoriteRegionToggleView,
@@ -51,5 +51,15 @@ urlpatterns = [
         "<int:region_id>/routes/generate/",
         RouteGenerateView.as_view(),
         name="route-generate",
+    ),
+    path(
+        "<int:region_id>/routes/saved/",
+        RouteListCreateView.as_view(),
+        name="route-list-create",
+    ),
+    path(
+        "<int:region_id>/routes/saved/<int:route_id>/",
+        RouteDetailView.as_view(),
+        name="route-detail",
     ),
 ]

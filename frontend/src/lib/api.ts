@@ -12,6 +12,8 @@ import type {
   Place,
   PlaceCreateRequest,
   PlaceUpdateRequest,
+  RouteListItem,
+  SaveRouteRequest,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -255,5 +257,77 @@ export async function deletePlace(
   handle401(res);
   if (!res.ok) {
     throw new Error(`Failed to delete place: ${res.status}`);
+  }
+}
+
+export async function saveRoute(
+  regionId: string,
+  request: SaveRouteRequest,
+): Promise<RouteListItem> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/saved/`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(request),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to save route: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchSavedRoutes(
+  regionId: string,
+): Promise<RouteListItem[]> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/saved/`,
+    {
+      cache: "no-store",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch saved routes: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function loadRoute(
+  regionId: string,
+  routeId: number,
+): Promise<RouteResponse> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/saved/${routeId}/`,
+    {
+      cache: "no-store",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to load route: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteRoute(
+  regionId: string,
+  routeId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/saved/${routeId}/`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to delete route: ${res.status}`);
   }
 }

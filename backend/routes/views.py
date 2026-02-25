@@ -8,10 +8,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from paths.models import Segment
 from places.models import Place
 from regions.models import Region
+from routes.models import Route
 from routes.serializers import (
+    RouteCreateSerializer,
     RouteGenerateRequestSerializer,
+    RouteListItemSerializer,
     RouteSegmentSerializer,
 )
 from routes.services import (
@@ -25,6 +29,8 @@ from routes.services import (
 from users.models import FavoriteRegion
 
 logger = logging.getLogger(__name__)
+
+MAX_SAVED_ROUTES_PER_REGION = 25
 
 
 class RouteGenerateView(APIView):
@@ -119,3 +125,145 @@ class RouteGenerateView(APIView):
                 "path_names": path_names,
             }
         )
+
+
+class RouteListCreateView(APIView):
+    """List and create saved routes for a region."""
+
+    def get(self, request: Request, region_id: int) -> Response:
+        """List all saved routes for the authenticated user in a region.
+
+        Args:
+            request: The authenticated HTTP request.
+            region_id: The region primary key.
+
+        Returns:
+            200 with list of saved routes, or 403/404.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        routes = Route.objects.filter(user=request.user, region=region)
+        return Response(RouteListItemSerializer(routes, many=True).data)
+
+    def post(self, request: Request, region_id: int) -> Response:
+        """Save a new route in a region.
+
+        Args:
+            request: The authenticated HTTP request with route data.
+            region_id: The region primary key.
+
+        Returns:
+            201 with created route summary, or 400/403/404/409.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = RouteCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        segment_ids = serializer.validated_data["segment_ids"]
+        existing_count = Segment.objects.filter(
+            pk__in=segment_ids, region=region
+        ).count()
+        if existing_count != len(segment_ids):
+            return Response(
+                {"detail": "One or more segment IDs do not belong to this region."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        route_count = Route.objects.filter(user=request.user, region=region).count()
+        if route_count >= MAX_SAVED_ROUTES_PER_REGION:
+            return Response(
+                {
+                    "detail": (
+                        f"Maximum of {MAX_SAVED_ROUTES_PER_REGION} "
+                        "saved routes per region reached."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        route = Route.objects.create(
+            user=request.user,
+            region=region,
+            name=serializer.validated_data["name"],
+            segment_ids=segment_ids,
+            total_distance=serializer.validated_data["total_distance"],
+            is_loop=serializer.validated_data["is_loop"],
+            start_point=serializer.validated_data.get("start_point"),
+            end_point=serializer.validated_data.get("end_point"),
+        )
+        return Response(
+            RouteListItemSerializer(route).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RouteDetailView(APIView):
+    """Retrieve or delete a specific saved route."""
+
+    def get(self, request: Request, region_id: int, route_id: int) -> Response:
+        """Retrieve a saved route with full segment data.
+
+        Args:
+            request: The authenticated HTTP request.
+            region_id: The region primary key.
+            route_id: The saved route primary key.
+
+        Returns:
+            200 with route data (same shape as RouteGenerateView), or 403/404.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
+
+        segments_qs = get_route_segments(route.segment_ids)
+        segments_data = RouteSegmentSerializer(segments_qs, many=True).data
+        path_names = get_route_path_names(route.segment_ids)
+
+        return Response(
+            {
+                "total_distance": route.total_distance,
+                "is_loop": route.is_loop,
+                "start_point": route.start_point,
+                "end_point": route.end_point,
+                "segments": segments_data,
+                "paths_count": len(path_names),
+                "path_names": path_names,
+            }
+        )
+
+    def delete(self, request: Request, region_id: int, route_id: int) -> Response:
+        """Delete a saved route.
+
+        Args:
+            request: The authenticated HTTP request.
+            region_id: The region primary key.
+            route_id: The saved route primary key.
+
+        Returns:
+            204 on success, or 403/404.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
+        route.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
