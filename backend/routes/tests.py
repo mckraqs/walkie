@@ -1230,3 +1230,121 @@ class TestValidateSegmentConnectivity:
     def test_empty_list(self) -> None:
         """Empty list returns True."""
         assert validate_segment_connectivity([]) is True
+
+
+@pytest.mark.django_db
+class TestRouteRenameView:
+    """Tests for the PATCH /api/regions/{id}/routes/saved/{route_id}/ endpoint."""
+
+    def test_rename_success(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """PATCH renames a route and returns updated summary."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.patch(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+            {"name": "Evening Stroll"},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Evening Stroll"
+        assert data["id"] == route.pk
+        route.refresh_from_db()
+        assert route.name == "Evening Stroll"
+
+    def test_empty_name_returns_400(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """PATCH with empty name returns 400."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.patch(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+            {"name": ""},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_non_favorite_region_returns_403(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """PATCH returns 403 when region is not a favorite."""
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.patch(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+            {"name": "New Name"},
+            format="json",
+        )
+
+        assert response.status_code == 403
+
+    def test_other_users_route_returns_404(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """PATCH returns 404 when trying to rename another user's route."""
+        other_user = User.objects.create_user(
+            username="otheruser4", password="otherpass123"
+        )
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(other_user, region_with_topology)
+
+        response = auth_client.patch(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+            {"name": "Hijacked"},
+            format="json",
+        )
+
+        assert response.status_code == 404
+
+    def test_nonexistent_route_returns_404(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """PATCH returns 404 for a nonexistent route."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+
+        response = auth_client.patch(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/999999/",
+            {"name": "Ghost"},
+            format="json",
+        )
+
+        assert response.status_code == 404
+
+    def test_unauthenticated_returns_401(
+        self,
+        region_with_topology: Region,
+        user: User,
+    ) -> None:
+        """PATCH returns 401 for unauthenticated access."""
+        route = _create_saved_route(user, region_with_topology)
+        client = APIClient()
+
+        response = client.patch(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/{route.pk}/",
+            {"name": "Sneaky"},
+            format="json",
+        )
+
+        assert response.status_code == 401

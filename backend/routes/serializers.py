@@ -82,3 +82,9 @@ class RouteListItemSerializer(serializers.Serializer):
     is_loop = serializers.BooleanField(read_only=True)
     is_custom = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+
+
+class RouteRenameSerializer(serializers.Serializer):
+    """Validate a route rename request."""
+
+    name = serializers.CharField(max_length=255)

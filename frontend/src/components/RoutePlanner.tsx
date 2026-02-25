@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type {
   RouteResponse,
   RouteType,
-  RouteListItem,
   SaveRouteRequest,
   Place,
 } from "@/types/geo";
@@ -17,10 +16,8 @@ interface RoutePlannerProps {
   onClear: () => void;
   isFavorite: boolean;
   places?: Place[];
-  savedRoutes: RouteListItem[];
   onSaveRoute: (request: SaveRouteRequest) => Promise<void>;
-  onLoadRoute: (routeId: number) => void;
-  onDeleteRoute: (routeId: number) => Promise<void>;
+  activeRouteId: number | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
@@ -41,10 +38,8 @@ export default function RoutePlanner({
   onClear,
   isFavorite,
   places,
-  savedRoutes,
   onSaveRoute,
-  onLoadRoute,
-  onDeleteRoute,
+  activeRouteId,
   collapsed,
   onToggleCollapsed,
   height,
@@ -200,61 +195,11 @@ export default function RoutePlanner({
           )}
         </form>
 
-        {isFavorite && savedRoutes.length > 0 && (
-          <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-700">
-            <label
-              htmlFor="saved-routes"
-              className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
-            >
-              Saved Routes
-            </label>
-            <div className="flex gap-1">
-              <select
-                id="saved-routes"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onLoadRoute(Number(e.target.value));
-                    e.target.value = "";
-                  }
-                }}
-                disabled={loading}
-                className="flex-1 rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
-              >
-                <option value="" disabled>
-                  Load a saved route...
-                </option>
-                {savedRoutes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} ({formatDistance(r.total_distance)}
-                    {r.is_loop ? ", loop" : ""})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => {
-                  const select = document.getElementById("saved-routes") as HTMLSelectElement | null;
-                  const routeId = select?.value ? Number(select.value) : null;
-                  if (routeId) {
-                    onDeleteRoute(routeId);
-                    select!.value = "";
-                  }
-                }}
-                className="rounded border border-red-300 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
-                title="Delete selected route"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        )}
-
         {error && (
           <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
         )}
 
-        {route && (
+        {route && activeRouteId === null && (
           <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-700">
             <div className="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
               <p>

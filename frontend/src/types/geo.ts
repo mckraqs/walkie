@@ -153,3 +153,7 @@ export interface SaveRouteRequest {
   start_point: [number, number] | null;
   end_point: [number, number] | null;
 }
+
+export interface RouteRenameRequest {
+  name: string;
+}

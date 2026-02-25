@@ -15,6 +15,7 @@ import type {
   PlaceUpdateRequest,
   RouteListItem,
   SaveRouteRequest,
+  RouteRenameRequest,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -345,4 +346,25 @@ export async function deleteRoute(
   if (!res.ok) {
     throw new Error(`Failed to delete route: ${res.status}`);
   }
+}
+
+export async function renameRoute(
+  regionId: string,
+  routeId: number,
+  request: RouteRenameRequest,
+): Promise<RouteListItem> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/saved/${routeId}/`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify(request),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to rename route: ${res.status}`);
+  }
+  return res.json();
 }

@@ -16,6 +16,7 @@ from routes.serializers import (
     RouteCreateSerializer,
     RouteGenerateRequestSerializer,
     RouteListItemSerializer,
+    RouteRenameSerializer,
     RouteSegmentSerializer,
 )
 from routes.services import (
@@ -255,6 +256,34 @@ class RouteDetailView(APIView):
                 "path_names": path_names,
             }
         )
+
+    def patch(self, request: Request, region_id: int, route_id: int) -> Response:
+        """Rename a saved route.
+
+        Args:
+            request: The authenticated HTTP request with the new name.
+            region_id: The region primary key.
+            route_id: The saved route primary key.
+
+        Returns:
+            200 with updated route summary, or 400/403/404.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
+
+        serializer = RouteRenameSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        route.name = serializer.validated_data["name"]
+        route.save(update_fields=["name"])
+
+        return Response(RouteListItemSerializer(route).data)
 
     def delete(self, request: Request, region_id: int, route_id: int) -> Response:
         """Delete a saved route.

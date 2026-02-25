@@ -9,6 +9,7 @@ import {
   fetchSavedRoutes,
   loadRoute,
   deleteRoute,
+  renameRoute,
   fetchRegionSegments,
 } from "@/lib/api";
 import SidePanel from "@/components/SidePanel";
@@ -99,6 +100,7 @@ export default function RegionExplorer({
   const [focusedPathId, setFocusedPathId] = useState<number | null>(null);
   const [selectedPathId, setSelectedPathId] = useState<number | null>(null);
   const [savedRoutes, setSavedRoutes] = useState<RouteListItem[]>([]);
+  const [activeRouteId, setActiveRouteId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
   const [segments, setSegments] = useState<SegmentFeatureCollection | null>(null);
   const [selectedSegmentIds, setSelectedSegmentIds] = useState<number[]>([]);
@@ -126,11 +128,13 @@ export default function RegionExplorer({
       try {
         const result = await loadRoute(regionId, routeId);
         setRoute(result);
+        setActiveRouteId(routeId);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load route",
         );
         setRoute(null);
+        setActiveRouteId(null);
       } finally {
         setLoading(false);
       }
@@ -142,8 +146,12 @@ export default function RegionExplorer({
     async (routeId: number) => {
       await deleteRoute(regionId, routeId);
       setSavedRoutes((prev) => prev.filter((r) => r.id !== routeId));
+      if (activeRouteId === routeId) {
+        setRoute(null);
+        setActiveRouteId(null);
+      }
     },
-    [regionId],
+    [regionId, activeRouteId],
   );
 
   const handleFocusHandled = useCallback(() => setFocusedPathId(null), []);
@@ -167,6 +175,7 @@ export default function RegionExplorer({
           end_place_id: endPlaceId,
         });
         setRoute(result);
+        setActiveRouteId(null);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to generate route",
@@ -181,6 +190,21 @@ export default function RegionExplorer({
 
   const handleClear = useCallback(() => {
     setRoute(null);
+    setActiveRouteId(null);
+    setError(null);
+  }, []);
+
+  const handleRenameRoute = useCallback(
+    async (routeId: number, name: string) => {
+      const updated = await renameRoute(regionId, routeId, { name });
+      setSavedRoutes((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    },
+    [regionId],
+  );
+
+  const handleClearLoadedRoute = useCallback(() => {
+    setRoute(null);
+    setActiveRouteId(null);
     setError(null);
   }, []);
 
@@ -359,6 +383,9 @@ export default function RegionExplorer({
         onSaveRoute={handleSaveRoute}
         onLoadRoute={handleLoadRoute}
         onDeleteRoute={handleDeleteRoute}
+        activeRouteId={activeRouteId}
+        onRenameRoute={handleRenameRoute}
+        onClearLoadedRoute={handleClearLoadedRoute}
         composing={composing}
         onStartComposing={handleStartComposing}
         onStopComposing={handleStopComposing}

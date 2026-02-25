@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SavedRoutes from "@/components/SavedRoutes";
 import RoutePlanner from "@/components/RoutePlanner";
 import RouteComposer from "@/components/RouteComposer";
 import PathList from "@/components/PathList";
@@ -27,6 +28,9 @@ interface SidePanelProps {
   onSaveRoute: (request: SaveRouteRequest) => Promise<void>;
   onLoadRoute: (routeId: number) => void;
   onDeleteRoute: (routeId: number) => Promise<void>;
+  activeRouteId: number | null;
+  onRenameRoute: (routeId: number, name: string) => Promise<void>;
+  onClearLoadedRoute: () => void;
   composing: boolean;
   onStartComposing: () => void;
   onStopComposing: () => void;
@@ -48,14 +52,15 @@ interface SidePanelProps {
 }
 
 function computeSectionHeight(
+  savedRoutesCollapsed: boolean,
   routePlannerCollapsed: boolean,
   composerCollapsed: boolean,
   pathListCollapsed: boolean,
   isCollapsed: boolean,
 ): string {
-  const sections = [routePlannerCollapsed, composerCollapsed, pathListCollapsed];
+  const sections = [savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed];
   const collapsedCount = sections.filter(Boolean).length;
-  const expandedCount = 3 - collapsedCount;
+  const expandedCount = 4 - collapsedCount;
 
   if (isCollapsed) {
     return HEADER;
@@ -80,6 +85,9 @@ export default function SidePanel({
   onSaveRoute,
   onLoadRoute,
   onDeleteRoute,
+  activeRouteId,
+  onRenameRoute,
+  onClearLoadedRoute,
   composing,
   onStartComposing,
   onStopComposing,
@@ -99,6 +107,7 @@ export default function SidePanel({
   onPathClick,
   onToggleWalk,
 }: SidePanelProps) {
+  const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
   const [composerCollapsed, setComposerCollapsed] = useState(true);
   const [pathListCollapsed, setPathListCollapsed] = useState(true);
@@ -106,6 +115,7 @@ export default function SidePanel({
   useEffect(() => {
     if (composing) {
       setRoutePlannerCollapsed(true);
+      setSavedRoutesCollapsed(true);
     }
   }, [composing]);
 
@@ -115,20 +125,36 @@ export default function SidePanel({
     }
   }, [route]);
 
+  const savedRoutesHeight = isFavorite
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, savedRoutesCollapsed)
+    : "0";
   const rpHeight = isFavorite
-    ? computeSectionHeight(routePlannerCollapsed, composerCollapsed, pathListCollapsed, routePlannerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, routePlannerCollapsed)
     : "0";
   const composerHeight = isFavorite
-    ? computeSectionHeight(routePlannerCollapsed, composerCollapsed, pathListCollapsed, composerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, composerCollapsed)
     : "0";
   const pathListHeight = isFavorite
-    ? computeSectionHeight(routePlannerCollapsed, composerCollapsed, pathListCollapsed, pathListCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, pathListCollapsed)
     : "0";
 
   return (
     <div className="absolute right-4 top-4 z-[1000] flex w-72 flex-col gap-2">
       {isFavorite && (
         <>
+          <SavedRoutes
+            savedRoutes={savedRoutes}
+            activeRouteId={activeRouteId}
+            loadedRouteDetails={activeRouteId !== null ? route : null}
+            loading={loading}
+            onLoadRoute={onLoadRoute}
+            onDeleteRoute={onDeleteRoute}
+            onRenameRoute={onRenameRoute}
+            onClearLoadedRoute={onClearLoadedRoute}
+            collapsed={savedRoutesCollapsed}
+            onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
+            height={savedRoutesHeight}
+          />
           <RoutePlanner
             route={route}
             loading={loading}
@@ -137,10 +163,8 @@ export default function SidePanel({
             onClear={onClear}
             isFavorite={isFavorite}
             places={places}
-            savedRoutes={savedRoutes}
             onSaveRoute={onSaveRoute}
-            onLoadRoute={onLoadRoute}
-            onDeleteRoute={onDeleteRoute}
+            activeRouteId={activeRouteId}
             collapsed={routePlannerCollapsed}
             onToggleCollapsed={() => setRoutePlannerCollapsed((c) => !c)}
             height={rpHeight}
