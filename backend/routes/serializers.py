@@ -81,6 +81,7 @@ class RouteListItemSerializer(serializers.Serializer):
     total_distance = serializers.FloatField(read_only=True)
     is_loop = serializers.BooleanField(read_only=True)
     is_custom = serializers.BooleanField(read_only=True)
+    walked = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
 
 

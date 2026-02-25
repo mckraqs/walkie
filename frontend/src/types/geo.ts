@@ -141,7 +141,15 @@ export interface RouteListItem {
   total_distance: number;
   is_loop: boolean;
   is_custom: boolean;
+  walked: boolean;
   created_at: string;
+}
+
+export interface RouteWalkToggleResponse {
+  id: number;
+  walked: boolean;
+  walked_path_ids: number[];
+  total_paths: number;
 }
 
 export interface SaveRouteRequest {

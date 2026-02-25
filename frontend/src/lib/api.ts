@@ -16,6 +16,7 @@ import type {
   RouteListItem,
   SaveRouteRequest,
   RouteRenameRequest,
+  RouteWalkToggleResponse,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -365,6 +366,24 @@ export async function renameRoute(
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail ?? `Failed to rename route: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function toggleRouteWalked(
+  regionId: string,
+  routeId: number,
+): Promise<RouteWalkToggleResponse> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/saved/${routeId}/walk/`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to toggle route walked: ${res.status}`);
   }
   return res.json();
 }

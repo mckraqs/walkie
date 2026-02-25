@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import {
   generateRoute,
   togglePathWalk,
+  toggleRouteWalked,
   saveRoute,
   fetchSavedRoutes,
   loadRoute,
@@ -202,6 +203,21 @@ export default function RegionExplorer({
     [regionId],
   );
 
+  const handleToggleRouteWalked = useCallback(
+    async (routeId: number) => {
+      try {
+        const result = await toggleRouteWalked(regionId, routeId);
+        setSavedRoutes((prev) =>
+          prev.map((r) => (r.id === result.id ? { ...r, walked: result.walked } : r)),
+        );
+        onWalkedChange(result.walked_path_ids, result.total_paths);
+      } catch {
+        // Silently handle
+      }
+    },
+    [regionId, onWalkedChange],
+  );
+
   const handleClearLoadedRoute = useCallback(() => {
     setRoute(null);
     setActiveRouteId(null);
@@ -385,6 +401,7 @@ export default function RegionExplorer({
         onDeleteRoute={handleDeleteRoute}
         activeRouteId={activeRouteId}
         onRenameRoute={handleRenameRoute}
+        onToggleRouteWalked={handleToggleRouteWalked}
         onClearLoadedRoute={handleClearLoadedRoute}
         composing={composing}
         onStartComposing={handleStartComposing}

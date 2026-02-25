@@ -27,6 +27,7 @@ class Route(models.Model):
     total_distance = models.FloatField()
     is_loop = models.BooleanField(default=False)
     is_custom = models.BooleanField(default=False)
+    walked = models.BooleanField(default=False)
     start_point = ArrayField(models.FloatField(), size=2, null=True, blank=True)
     end_point = ArrayField(models.FloatField(), size=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

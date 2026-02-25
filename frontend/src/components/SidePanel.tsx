@@ -30,6 +30,7 @@ interface SidePanelProps {
   onDeleteRoute: (routeId: number) => Promise<void>;
   activeRouteId: number | null;
   onRenameRoute: (routeId: number, name: string) => Promise<void>;
+  onToggleRouteWalked: (routeId: number) => void;
   onClearLoadedRoute: () => void;
   composing: boolean;
   onStartComposing: () => void;
@@ -87,6 +88,7 @@ export default function SidePanel({
   onDeleteRoute,
   activeRouteId,
   onRenameRoute,
+  onToggleRouteWalked,
   onClearLoadedRoute,
   composing,
   onStartComposing,
@@ -150,6 +152,7 @@ export default function SidePanel({
             onLoadRoute={onLoadRoute}
             onDeleteRoute={onDeleteRoute}
             onRenameRoute={onRenameRoute}
+            onToggleWalked={onToggleRouteWalked}
             onClearLoadedRoute={onClearLoadedRoute}
             collapsed={savedRoutesCollapsed}
             onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}

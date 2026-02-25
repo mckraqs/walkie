@@ -11,6 +11,7 @@ interface SavedRoutesProps {
   onLoadRoute: (routeId: number) => void;
   onDeleteRoute: (routeId: number) => Promise<void>;
   onRenameRoute: (routeId: number, name: string) => Promise<void>;
+  onToggleWalked: (routeId: number) => void;
   onClearLoadedRoute: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -32,6 +33,7 @@ export default function SavedRoutes({
   onLoadRoute,
   onDeleteRoute,
   onRenameRoute,
+  onToggleWalked,
   onClearLoadedRoute,
   collapsed,
   onToggleCollapsed,
@@ -86,7 +88,7 @@ export default function SavedRoutes({
           Saved Routes
           {savedRoutes.length > 0 && (
             <span className="ml-1.5 text-xs font-normal text-zinc-400 dark:text-zinc-500">
-              ({savedRoutes.length})
+              ({savedRoutes.filter((r) => r.walked).length}/{savedRoutes.length} walked)
             </span>
           )}
         </h3>
@@ -129,6 +131,17 @@ export default function SavedRoutes({
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
+                  <input
+                    type="checkbox"
+                    checked={route.walked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleWalked(route.id);
+                    }}
+                    readOnly
+                    className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-green-600"
+                    title={route.walked ? "Mark as not walked" : "Mark as walked"}
+                  />
                   {renamingId === route.id ? (
                     <div className="flex flex-1 items-center gap-1">
                       <input

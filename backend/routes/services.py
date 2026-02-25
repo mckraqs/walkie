@@ -198,6 +198,22 @@ def get_route_path_names(segment_ids: list[int]) -> list[str]:
     return result
 
 
+def get_route_path_ids(segment_ids: list[int]) -> list[int]:
+    """Resolve segment IDs to their parent Path IDs via PathSegment.
+
+    Args:
+        segment_ids: List of segment IDs from a route.
+
+    Returns:
+        Distinct path IDs that contain the given segments.
+    """
+    return list(
+        PathSegment.objects.filter(segment_id__in=segment_ids)
+        .values_list("path_id", flat=True)
+        .distinct()
+    )
+
+
 def validate_segment_connectivity(segment_ids: list[int]) -> bool:
     """Check that a sequence of segments forms a connected topology chain.
 
