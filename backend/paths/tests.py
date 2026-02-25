@@ -216,6 +216,116 @@ class TestRegionPathsListView:
 
 
 @pytest.mark.django_db
+class TestRegionSegmentsListView:
+    """Tests for the GET /api/regions/{id}/segments/ endpoint."""
+
+    def test_returns_geojson_with_topology_fields(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
+        """Endpoint returns GeoJSON with source, target, length in properties."""
+        Segment.objects.create(
+            region=saved_region,
+            name="Test Segment",
+            geometry=GEOSGeometry(
+                "LINESTRING(20.000 50.000, 20.001 50.000)", srid=4326
+            ),
+            category="footway",
+            surface="asphalt",
+            source=1,
+            target=2,
+        )
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/segments/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["type"] == "FeatureCollection"
+        assert len(data["features"]) == 1
+        props = data["features"][0]["properties"]
+        assert "source" in props
+        assert "target" in props
+        assert "length" in props
+        assert props["source"] == 1
+        assert props["target"] == 2
+        assert isinstance(props["length"], float)
+        assert props["length"] > 0
+
+    def test_filters_by_region(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
+        """Only segments for the requested region are returned."""
+        other_region = Region.objects.create(
+            code="0002_0002",
+            name="Other Region",
+            boundary=GEOSGeometry(
+                "MULTIPOLYGON(((22.0 52.0, 23.0 52.0, 23.0 53.0"
+                ", 22.0 53.0, 22.0 52.0)))",
+                srid=4326,
+            ),
+        )
+        Segment.objects.create(
+            region=saved_region,
+            name="In Region",
+            geometry=GEOSGeometry(
+                "LINESTRING(20.000 50.000, 20.001 50.000)", srid=4326
+            ),
+            category="footway",
+            source=1,
+            target=2,
+        )
+        Segment.objects.create(
+            region=other_region,
+            name="Other Segment",
+            geometry=GEOSGeometry(
+                "LINESTRING(22.000 52.000, 22.001 52.000)", srid=4326
+            ),
+            category="footway",
+            source=3,
+            target=4,
+        )
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/segments/")
+
+        data = response.json()
+        assert len(data["features"]) == 1
+        assert data["features"][0]["properties"]["name"] == "In Region"
+
+    def test_excludes_null_source_target(
+        self, saved_region: Region, auth_client: APIClient
+    ) -> None:
+        """Segments with null source or target are excluded."""
+        Segment.objects.create(
+            region=saved_region,
+            name="Routable",
+            geometry=GEOSGeometry(
+                "LINESTRING(20.000 50.000, 20.001 50.000)", srid=4326
+            ),
+            category="footway",
+            source=1,
+            target=2,
+        )
+        Segment.objects.create(
+            region=saved_region,
+            name="Non-routable",
+            geometry=GEOSGeometry(
+                "LINESTRING(20.002 50.000, 20.003 50.000)", srid=4326
+            ),
+            category="footway",
+            source=None,
+            target=None,
+        )
+        response = auth_client.get(f"/api/regions/{saved_region.pk}/segments/")
+
+        data = response.json()
+        assert len(data["features"]) == 1
+        assert data["features"][0]["properties"]["name"] == "Routable"
+
+    def test_unauthenticated_returns_401(self, saved_region: Region) -> None:
+        """Endpoint returns 401 for unauthenticated access."""
+        client = APIClient()
+        response = client.get(f"/api/regions/{saved_region.pk}/segments/")
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
 class TestLoadSegments:
     """Tests for the load_segments management command."""
 

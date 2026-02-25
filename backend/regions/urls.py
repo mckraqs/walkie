@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from paths.views import RegionPathsListView
+from paths.views import RegionPathsListView, RegionSegmentsListView
 from places.views import PlaceDetailView, PlaceListCreateView
 from regions.views import RegionDetailView, RegionListView
 from routes.views import RouteDetailView, RouteGenerateView, RouteListCreateView
@@ -26,6 +26,11 @@ urlpatterns = [
         "<int:region_id>/paths/",
         RegionPathsListView.as_view(),
         name="region-paths-list",
+    ),
+    path(
+        "<int:region_id>/segments/",
+        RegionSegmentsListView.as_view(),
+        name="region-segments-list",
     ),
     path(
         "<int:region_id>/paths/walked/",

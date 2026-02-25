@@ -19,6 +19,7 @@ from routes.services import (
     generate_route,
     get_route_path_names,
     get_route_segments,
+    validate_segment_connectivity,
 )
 from users.models import FavoriteRegion
 
@@ -691,6 +692,7 @@ def _create_saved_route(
     *,
     name: str = "Morning Walk",
     segment_ids: list[int] | None = None,
+    is_custom: bool = False,
 ) -> Route:
     """Create a saved Route for testing."""
     if segment_ids is None:
@@ -706,6 +708,7 @@ def _create_saved_route(
         segment_ids=segment_ids,
         total_distance=500.0,
         is_loop=False,
+        is_custom=is_custom,
         start_point=[20.0, 50.0],
         end_point=[20.001, 50.0],
     )
@@ -766,6 +769,15 @@ class TestRouteModel:
         route = _create_saved_route(user, region_with_topology)
         assert user.username in str(route)
         assert route.name in str(route)
+
+    def test_is_custom_defaults_to_false(
+        self,
+        region_with_topology: Region,
+        user: User,
+    ) -> None:
+        """Route.is_custom defaults to False."""
+        route = _create_saved_route(user, region_with_topology)
+        assert route.is_custom is False
 
 
 @pytest.mark.django_db
@@ -973,6 +985,93 @@ class TestRouteListCreateView:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_create_custom_route_with_is_custom_flag(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST with is_custom=true creates a custom route."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        _build_test_topology()
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "Custom Walk",
+                "segment_ids": segment_ids,
+                "total_distance": 200.0,
+                "is_loop": False,
+                "is_custom": True,
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["is_custom"] is True
+
+    def test_create_custom_route_validates_connectivity(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST with is_custom=true and disconnected segments returns 400."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        # Create a disconnected segment in a different location
+        disconnected = Segment.objects.create(
+            region=region_with_topology,
+            name="Disconnected",
+            geometry=GEOSGeometry(
+                "LINESTRING(21.000 51.000, 21.001 51.000)", srid=4326
+            ),
+            category="footway",
+            surface="asphalt",
+            source=999,
+            target=998,
+        )
+        connected_id = (
+            Segment.objects.filter(region=region_with_topology)
+            .exclude(pk=disconnected.pk)
+            .first()
+            .pk
+        )
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "Bad Custom",
+                "segment_ids": [connected_id, disconnected.pk],
+                "total_distance": 200.0,
+                "is_loop": False,
+                "is_custom": True,
+            },
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "connected" in response.json()["detail"].lower()
+
+    def test_list_includes_is_custom(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """GET list includes is_custom field."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        _create_saved_route(user, region_with_topology, is_custom=True)
+        response = auth_client.get(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert "is_custom" in data[0]
+        assert data[0]["is_custom"] is True
+
 
 @pytest.mark.django_db
 class TestRouteDetailView:
@@ -1088,3 +1187,46 @@ class TestRouteDetailView:
         )
 
         assert response.status_code == 403
+
+
+@pytest.mark.django_db
+class TestValidateSegmentConnectivity:
+    """Tests for validate_segment_connectivity."""
+
+    def test_connected_segments(self, region_with_topology: Region) -> None:
+        """Connected segments return True."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        assert validate_segment_connectivity(segment_ids) is True
+
+    def test_disconnected_segments(self, region_with_topology: Region) -> None:
+        """Disconnected segments return False."""
+        disconnected = Segment.objects.create(
+            region=region_with_topology,
+            name="Isolated",
+            geometry=GEOSGeometry(
+                "LINESTRING(21.000 51.000, 21.001 51.000)", srid=4326
+            ),
+            category="footway",
+            source=999,
+            target=998,
+        )
+        first_id = (
+            Segment.objects.filter(region=region_with_topology)
+            .exclude(pk=disconnected.pk)
+            .first()
+            .pk
+        )
+        assert validate_segment_connectivity([first_id, disconnected.pk]) is False
+
+    def test_single_segment(self, region_with_topology: Region) -> None:
+        """Single segment returns True."""
+        segment_id = Segment.objects.filter(region=region_with_topology).first().pk
+        assert validate_segment_connectivity([segment_id]) is True
+
+    def test_empty_list(self) -> None:
+        """Empty list returns True."""
+        assert validate_segment_connectivity([]) is True

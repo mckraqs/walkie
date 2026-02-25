@@ -53,6 +53,30 @@ export interface PathFeatureCollection {
   features: PathFeature[];
 }
 
+export interface SegmentProperties {
+  name: string;
+  category: string;
+  surface: string;
+  accessible: boolean;
+  is_lit: boolean;
+  source: number;
+  target: number;
+  length: number;
+  created_at: string;
+}
+
+export interface SegmentFeature {
+  id: number;
+  type: "Feature";
+  geometry: GeoJSON.LineString;
+  properties: SegmentProperties;
+}
+
+export interface SegmentFeatureCollection {
+  type: "FeatureCollection";
+  features: SegmentFeature[];
+}
+
 export interface RegionListItem {
   id: number;
   code: string;
@@ -116,6 +140,7 @@ export interface RouteListItem {
   name: string;
   total_distance: number;
   is_loop: boolean;
+  is_custom: boolean;
   created_at: string;
 }
 
@@ -124,6 +149,7 @@ export interface SaveRouteRequest {
   segment_ids: number[];
   total_distance: number;
   is_loop: boolean;
+  is_custom?: boolean;
   start_point: [number, number] | null;
   end_point: [number, number] | null;
 }

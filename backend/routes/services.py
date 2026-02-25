@@ -1,6 +1,7 @@
 """Route generation service using pgRouting."""
 
 import enum
+import itertools
 import logging
 import random
 from dataclasses import dataclass
@@ -197,6 +198,43 @@ def get_route_path_names(segment_ids: list[int]) -> list[str]:
     return result
 
 
+def validate_segment_connectivity(segment_ids: list[int]) -> bool:
+    """Check that a sequence of segments forms a connected topology chain.
+
+    For each consecutive pair of segments, verifies that they share at least
+    one topology node (i.e. one segment's source or target matches the other's
+    source or target).
+
+    Args:
+        segment_ids: Ordered list of segment IDs to validate.
+
+    Returns:
+        True if all consecutive pairs are topologically connected, or if the
+        list has fewer than two elements. False if any gap is found.
+    """
+    if len(segment_ids) < 2:
+        return True
+
+    nodes: dict[int, tuple[int | None, int | None]] = {
+        seg_id: (source, target)
+        for seg_id, source, target in Segment.objects.filter(
+            pk__in=segment_ids
+        ).values_list("id", "source", "target")
+    }
+
+    for a_id, b_id in itertools.pairwise(segment_ids):
+        a = nodes.get(a_id)
+        b = nodes.get(b_id)
+        if a is None or b is None:
+            return False
+        a_nodes = {n for n in a if n is not None}
+        b_nodes = {n for n in b if n is not None}
+        if not a_nodes.intersection(b_nodes):
+            return False
+
+    return True
+
+
 def _generate_one_way_route(
     region_id: int,
     target_distance_m: float,
@@ -268,7 +306,7 @@ def _generate_loop_route(
         region_id, target_node, source_node, edges_sql=penalized_sql
     )
 
-    return_distance = _compute_actual_distance(return_result.segment_ids)
+    return_distance = compute_segment_distance(return_result.segment_ids)
     total_distance = outbound.total_distance + return_distance
 
     seen: set[int] = set()
@@ -367,8 +405,8 @@ def _build_penalized_edges_sql(
     """
 
 
-def _compute_actual_distance(segment_ids: list[int]) -> float:
-    """Compute the real total distance of segments by geometry length.
+def compute_segment_distance(segment_ids: list[int]) -> float:
+    """Compute the total geographic distance of a list of segments.
 
     Args:
         segment_ids: List of segment IDs to sum distance for.
@@ -377,7 +415,7 @@ def _compute_actual_distance(segment_ids: list[int]) -> float:
         Total distance in meters.
 
     Raises:
-        RouteGenerationError: If no segments are found.
+        RouteGenerationError: If no distance can be computed for the given IDs.
     """
     if not segment_ids:
         return 0.0

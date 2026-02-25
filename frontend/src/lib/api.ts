@@ -2,6 +2,7 @@ import type {
   RegionFeature,
   RegionListItem,
   PathFeatureCollection,
+  SegmentFeatureCollection,
   RouteGenerateRequest,
   RouteResponse,
   LoginRequest,
@@ -78,6 +79,20 @@ export async function fetchRegionPaths(
   handle401(res);
   if (!res.ok) {
     throw new Error(`Failed to fetch paths for region ${regionId}: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchRegionSegments(
+  regionId: string,
+): Promise<SegmentFeatureCollection> {
+  const res = await fetch(`${API_URL}/api/regions/${regionId}/segments/`, {
+    cache: "no-store",
+    headers: authHeaders(),
+  });
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch segments for region ${regionId}: ${res.status}`);
   }
   return res.json();
 }

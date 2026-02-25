@@ -20,6 +20,8 @@ import type {
   PathFeatureCollection,
   RouteResponse,
   Place,
+  SegmentFeature,
+  SegmentFeatureCollection,
 } from "@/types/geo";
 
 interface PathMapProps {
@@ -41,6 +43,13 @@ interface PathMapProps {
   isCreatingPlace?: boolean;
   onPlaceCreate?: (location: [number, number]) => void;
   onPlaceDelete?: () => void;
+  composing?: boolean;
+  segments?: SegmentFeatureCollection | null;
+  selectedSegmentIds?: number[];
+  onSegmentClick?: (segmentId: number) => void;
+  composerError?: string | null;
+  composedStartPoint?: [number, number] | null;
+  composedEndPoint?: [number, number] | null;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -76,6 +85,24 @@ const WALKED_STYLE: PathOptions = {
 const ROUTE_HOVER_STYLE: PathOptions = {
   color: "#d97706",
   weight: 6,
+  opacity: 1,
+};
+
+const SEGMENT_AVAILABLE_STYLE: PathOptions = {
+  color: "#9ca3af",
+  weight: 3,
+  opacity: 0.6,
+};
+
+const SEGMENT_HOVER_STYLE: PathOptions = {
+  color: "#6b7280",
+  weight: 5,
+  opacity: 0.8,
+};
+
+const SEGMENT_REJECTED_STYLE: PathOptions = {
+  color: "#ef4444",
+  weight: 5,
   opacity: 1,
 };
 
@@ -303,9 +330,16 @@ export default function PathMap({
   isCreatingPlace,
   onPlaceCreate,
   onPlaceDelete,
+  composing,
+  segments,
+  selectedSegmentIds,
+  onSegmentClick,
+  composerError,
+  composedStartPoint,
+  composedEndPoint,
 }: PathMapProps) {
-  const hasRoute = route && route.segments.features.length > 0;
-  const totalSegments = hasRoute ? route.segments.features.length : 0;
+  const hasRoute = composing || (route && route.segments.features.length > 0);
+  const totalSegments = hasRoute && route ? route.segments.features.length : 0;
   const layerMapRef = useRef<Map<number, L.Path>>(new Map());
   const mapRef = useRef<L.Map | null>(null);
 
@@ -356,6 +390,22 @@ export default function PathMap({
   siblingIdsMapRef.current = siblingIdsMap;
   const selectionFromMapRef = useRef(false);
   const pathClickedRef = useRef(false);
+
+  // Composition mode state and refs
+  const [rejectedSegmentId, setRejectedSegmentId] = useState<number | null>(null);
+  const rejectedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const onSegmentClickRef = useRef(onSegmentClick);
+  onSegmentClickRef.current = onSegmentClick;
+  const selectedSegmentIdsRef = useRef(selectedSegmentIds);
+  selectedSegmentIdsRef.current = selectedSegmentIds;
+  const composingRef = useRef(composing);
+  composingRef.current = composing;
+
+  useEffect(() => {
+    // When composerError changes and there's an error, we could flash the last clicked segment
+    // The parent manages error state; this is handled by the segment click rejection in RegionExplorer
+  }, [composerError]);
 
   // Tooltip state
   const [tooltipData, setTooltipData] = useState<{
@@ -522,6 +572,7 @@ export default function PathMap({
 
               layer.on({
                 click: (e) => {
+                  if (composingRef.current) return;
                   if (hasRouteRef.current) return;
                   pathClickedRef.current = true;
                   const containerPoint = (
@@ -586,7 +637,7 @@ export default function PathMap({
             }}
           />
         )}
-        {hasRoute && (
+        {hasRoute && route && route.segments.features.length > 0 && (
           <>
             <GeoJSON
               key={`route-${route.total_distance}`}
@@ -625,6 +676,56 @@ export default function PathMap({
             />
             <RouteMarkers route={route} />
           </>
+        )}
+        {composing && segments && (
+          <GeoJSON
+            key={`segments-compose-${segments.features.length}`}
+            data={segments}
+            style={(feature) => {
+              const segId = (feature as SegmentFeature).id;
+              if (rejectedSegmentId === segId) return SEGMENT_REJECTED_STYLE;
+              if (selectedSegmentIds?.includes(segId)) {
+                const idx = selectedSegmentIds.indexOf(segId);
+                const total = selectedSegmentIds.length;
+                return { color: getSegmentColor(idx, total), weight: 5, opacity: 0.9 };
+              }
+              return SEGMENT_AVAILABLE_STYLE;
+            }}
+            onEachFeature={(feature, layer: Layer) => {
+              const segId = (feature as SegmentFeature).id;
+              layer.on({
+                click: () => {
+                  onSegmentClickRef.current?.(segId);
+                },
+                mouseover: (e) => {
+                  if (!selectedSegmentIdsRef.current?.includes(segId)) {
+                    (e.target as L.Path).setStyle(SEGMENT_HOVER_STYLE);
+                  }
+                },
+                mouseout: (e) => {
+                  if (rejectedSegmentId === segId) return;
+                  if (selectedSegmentIdsRef.current?.includes(segId)) {
+                    const idx = selectedSegmentIdsRef.current.indexOf(segId);
+                    const total = selectedSegmentIdsRef.current.length;
+                    (e.target as L.Path).setStyle({ color: getSegmentColor(idx, total), weight: 5, opacity: 0.9 });
+                  } else {
+                    (e.target as L.Path).setStyle(SEGMENT_AVAILABLE_STYLE);
+                  }
+                },
+              });
+            }}
+          />
+        )}
+        {composing && composedStartPoint && composedEndPoint && (
+          <RouteMarkers route={{
+            total_distance: 0,
+            is_loop: false,
+            start_point: composedStartPoint,
+            end_point: composedEndPoint,
+            segments: { type: "FeatureCollection", features: [] },
+            paths_count: 0,
+            path_names: [],
+          }} />
         )}
       </MapContainer>
       {tooltipData && (

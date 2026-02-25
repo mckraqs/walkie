@@ -25,6 +25,7 @@ from routes.services import (
     generate_route,
     get_route_path_names,
     get_route_segments,
+    validate_segment_connectivity,
 )
 from users.models import FavoriteRegion
 
@@ -170,12 +171,20 @@ class RouteListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         segment_ids = serializer.validated_data["segment_ids"]
+        is_custom = serializer.validated_data["is_custom"]
+
         existing_count = Segment.objects.filter(
             pk__in=segment_ids, region=region
         ).count()
         if existing_count != len(segment_ids):
             return Response(
                 {"detail": "One or more segment IDs do not belong to this region."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if is_custom and not validate_segment_connectivity(segment_ids):
+            return Response(
+                {"detail": "Segments do not form a connected route."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -198,6 +207,7 @@ class RouteListCreateView(APIView):
             segment_ids=segment_ids,
             total_distance=serializer.validated_data["total_distance"],
             is_loop=serializer.validated_data["is_loop"],
+            is_custom=is_custom,
             start_point=serializer.validated_data.get("start_point"),
             end_point=serializer.validated_data.get("end_point"),
         )
