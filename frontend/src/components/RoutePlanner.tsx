@@ -21,6 +21,9 @@ interface RoutePlannerProps {
   onSaveRoute: (request: SaveRouteRequest) => Promise<void>;
   onLoadRoute: (routeId: number) => void;
   onDeleteRoute: (routeId: number) => Promise<void>;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  height: string;
 }
 
 function formatDistance(meters: number): string {
@@ -42,8 +45,10 @@ export default function RoutePlanner({
   onSaveRoute,
   onLoadRoute,
   onDeleteRoute,
+  collapsed,
+  onToggleCollapsed,
+  height,
 }: RoutePlannerProps) {
-  const [collapsed, setCollapsed] = useState(true);
   const [distance, setDistance] = useState("3");
   const [routeType, setRouteType] = useState<RouteType>("one_way");
   const [startPlaceId, setStartPlaceId] = useState<number | null>(null);
@@ -67,10 +72,10 @@ export default function RoutePlanner({
   }
 
   return (
-    <div className={`absolute left-4 bottom-4 z-[1000] flex w-72 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg transition-all duration-300 ease-in-out dark:border-zinc-700 dark:bg-zinc-900 ${collapsed ? "max-h-[2.75rem]" : "max-h-[50vh]"}`}>
+    <div className="flex flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg transition-all duration-300 ease-in-out dark:border-zinc-700 dark:bg-zinc-900" style={{ height }}>
       <button
         type="button"
-        onClick={() => setCollapsed((c) => !c)}
+        onClick={onToggleCollapsed}
         className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 ${collapsed ? "" : "border-b border-zinc-200 dark:border-zinc-700"}`}
       >
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">

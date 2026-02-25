@@ -26,6 +26,9 @@ interface PathListProps {
   onPathHover: (pathId: number | null) => void;
   onPathClick: (pathId: number) => void;
   onToggleWalk: (pathId: number) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  maxHeight: string;
 }
 
 export default function PathList({
@@ -38,10 +41,12 @@ export default function PathList({
   onPathHover,
   onPathClick,
   onToggleWalk,
+  collapsed,
+  onToggleCollapsed,
+  maxHeight,
 }: PathListProps) {
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [searchQuery, setSearchQuery] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     if (selectedPathId == null) return;
@@ -64,10 +69,10 @@ export default function PathList({
   }, [paths.features, walkedPathIds, showWalkedOnly, searchQuery]);
 
   return (
-    <div className={`absolute right-4 top-4 z-[1000] flex w-72 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg transition-all duration-300 ease-in-out dark:border-zinc-700 dark:bg-zinc-900 ${collapsed ? "max-h-[2.75rem]" : "max-h-[calc(100vh-8rem)]"}`}>
+    <div className="flex flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg transition-all duration-300 ease-in-out dark:border-zinc-700 dark:bg-zinc-900" style={{ maxHeight }}>
       <button
         type="button"
-        onClick={() => setCollapsed((c) => !c)}
+        onClick={onToggleCollapsed}
         className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 ${collapsed ? "" : "border-b border-zinc-200 dark:border-zinc-700"}`}
       >
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">

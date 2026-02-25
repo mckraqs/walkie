@@ -10,9 +10,8 @@ import {
   loadRoute,
   deleteRoute,
 } from "@/lib/api";
-import RoutePlanner from "@/components/RoutePlanner";
+import SidePanel from "@/components/SidePanel";
 import PlaceNameDialog from "@/components/PlaceNameDialog";
-import PathList from "@/components/PathList";
 import type {
   RegionFeature,
   PathFeatureCollection,
@@ -170,23 +169,20 @@ export default function RegionExplorer({
 
   return (
     <div className="relative h-full">
-      <RoutePlanner
+      <SidePanel
+        isFavorite={isFavorite}
         route={route}
         loading={loading}
         error={error}
         onGenerate={handleGenerate}
         onClear={handleClear}
-        isFavorite={isFavorite}
         places={places}
         savedRoutes={savedRoutes}
         onSaveRoute={handleSaveRoute}
         onLoadRoute={handleLoadRoute}
         onDeleteRoute={handleDeleteRoute}
-      />
-      <PathList
         paths={displayedPaths}
         walkedPathIds={walkedPathIds}
-        isFavorite={isFavorite}
         showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         selectedPathId={selectedPathId}
