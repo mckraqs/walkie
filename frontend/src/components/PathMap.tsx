@@ -45,8 +45,8 @@ interface PathMapProps {
 
 const PATH_STYLE: PathOptions = {
   color: "#3b82f6",
-  weight: 3,
-  opacity: 0.8,
+  weight: 4,
+  opacity: 1,
 };
 
 const PATH_DIMMED_STYLE: PathOptions = {
@@ -321,6 +321,26 @@ export default function PathMap({
     return m;
   }, [paths]);
 
+  // Map from path ID to all sibling IDs (same name = same physical road)
+  const siblingIdsMap = useMemo(() => {
+    const nameToIds = new Map<string, number[]>();
+    for (const f of paths.features) {
+      const name = f.properties.name;
+      if (!name) continue;
+      let ids = nameToIds.get(name);
+      if (!ids) {
+        ids = [];
+        nameToIds.set(name, ids);
+      }
+      ids.push(f.id);
+    }
+    const result = new Map<number, number[]>();
+    for (const ids of nameToIds.values()) {
+      for (const id of ids) result.set(id, ids);
+    }
+    return result;
+  }, [paths]);
+
   // Refs to avoid stale closures in onEachFeature callbacks
   const walkedPathIdsRef = useRef(walkedPathIds);
   walkedPathIdsRef.current = walkedPathIds;
@@ -332,6 +352,8 @@ export default function PathMap({
   selectedPathIdRef.current = selectedPathId;
   const onPathSelectRef = useRef(onPathSelect);
   onPathSelectRef.current = onPathSelect;
+  const siblingIdsMapRef = useRef(siblingIdsMap);
+  siblingIdsMapRef.current = siblingIdsMap;
   const selectionFromMapRef = useRef(false);
   const pathClickedRef = useRef(false);
 
@@ -359,6 +381,27 @@ export default function PathMap({
     return HOVER_STYLE;
   }
 
+  function setSiblingsStyle(pathId: number, style: PathOptions) {
+    const siblings = siblingIdsMapRef.current.get(pathId);
+    if (!siblings) return;
+    for (const sid of siblings) {
+      if (sid === pathId) continue;
+      const layer = layerMapRef.current.get(sid);
+      if (layer) layer.setStyle(style);
+    }
+  }
+
+  function resetSiblingsStyle(pathId: number) {
+    const siblings = siblingIdsMapRef.current.get(pathId);
+    if (!siblings) return;
+    for (const sid of siblings) {
+      if (sid === pathId) continue;
+      if (selectedPathIdRef.current === sid) continue;
+      const layer = layerMapRef.current.get(sid);
+      if (layer) layer.setStyle(getBaseStyle(sid));
+    }
+  }
+
   // Imperative style update when walkedPathIds changes
   useEffect(() => {
     layerMapRef.current.forEach((layer, pathId) => {
@@ -369,7 +412,7 @@ export default function PathMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walkedPathIds, hasRoute]);
 
-  // External hover (from PathList) drives style
+  // External hover drives style (highlight all siblings)
   useEffect(() => {
     if (hoveredPathId == null) return;
     const layer = layerMapRef.current.get(hoveredPathId);
@@ -377,8 +420,9 @@ export default function PathMap({
 
     layer.setStyle(HOVER_STYLE);
     layer.bringToFront();
+    setSiblingsStyle(hoveredPathId, HOVER_STYLE);
 
-    // Show tooltip at path center for hover originating from PathList (favorite only, no selection active)
+    // Show tooltip at path center (favorite only, no selection active)
     if (selectedPathId == null && isFavorite && hoveredPathIdRef.current !== hoveredPathId && mapRef.current) {
       const feature = pathFeatureMap.get(hoveredPathId);
       if (feature) {
@@ -395,6 +439,7 @@ export default function PathMap({
       } else {
         layer.setStyle(getBaseStyle(hoveredPathId));
       }
+      resetSiblingsStyle(hoveredPathId);
       // Clear tooltip only if no selection and no active map hover
       if (selectedPathId == null && hoveredPathIdRef.current == null) {
         setTooltipData(null);
@@ -422,6 +467,7 @@ export default function PathMap({
       layer.setStyle(SELECTED_STYLE);
       layer.bringToFront();
     }
+    setSiblingsStyle(selectedPathId, SELECTED_STYLE);
 
     const feature = pathFeatureMap.get(selectedPathId);
     if (selectionFromMapRef.current) {
@@ -495,6 +541,7 @@ export default function PathMap({
                   clearTimeout(hideTimerRef.current);
                   hoveredPathIdRef.current = pathId;
                   (e.target as L.Path).setStyle(getHoverStyle());
+                  setSiblingsStyle(pathId, getHoverStyle());
                   onPathHoverRef.current?.(pathId);
                   if (selectedPathIdRef.current == null) {
                     const containerPoint = (
@@ -526,6 +573,7 @@ export default function PathMap({
                   } else {
                     (e.target as L.Path).setStyle(getBaseStyle(pathId));
                   }
+                  resetSiblingsStyle(pathId);
                   hoveredPathIdRef.current = null;
                   onPathHoverRef.current?.(null);
                   if (selectedPathIdRef.current == null) {

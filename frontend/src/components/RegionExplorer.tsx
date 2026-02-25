@@ -22,6 +22,7 @@ import type {
   Place,
 } from "@/types/geo";
 
+
 const PathMap = dynamic(() => import("@/components/PathMap"), { ssr: false });
 
 interface RegionExplorerProps {
@@ -181,14 +182,6 @@ export default function RegionExplorer({
         onSaveRoute={handleSaveRoute}
         onLoadRoute={handleLoadRoute}
         onDeleteRoute={handleDeleteRoute}
-        paths={displayedPaths}
-        walkedPathIds={walkedPathIds}
-        showWalkedOnly={showWalkedOnly}
-        hoveredPathId={hoveredPathId}
-        selectedPathId={selectedPathId}
-        onPathHover={setHoveredPathId}
-        onPathClick={handlePathClickFromList}
-        onToggleWalk={handleToggleWalk}
       />
       <PathMap
         region={region}
