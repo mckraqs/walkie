@@ -8,6 +8,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from places.models import Place
 from regions.models import Region
 from routes.serializers import (
     RouteGenerateRequestSerializer,
@@ -16,6 +17,7 @@ from routes.serializers import (
 from routes.services import (
     RouteGenerationError,
     RouteType,
+    _find_nearest_node_at_distance,
     generate_route,
     get_route_path_names,
     get_route_segments,
@@ -52,6 +54,9 @@ class RouteGenerateView(APIView):
         target_distance_m = serializer.validated_data["target_distance_km"] * 1000
         route_type = RouteType(serializer.validated_data["route_type"])
 
+        start_place_id = serializer.validated_data.get("start_place_id")
+        end_place_id = serializer.validated_data.get("end_place_id")
+
         logger.info(
             "Route request: region_id=%d, target_distance_m=%.0f, route_type=%s",
             region_id,
@@ -60,7 +65,32 @@ class RouteGenerateView(APIView):
         )
 
         try:
-            result = generate_route(region_id, target_distance_m, route_type)
+            start_node_override = None
+            end_node_override = None
+
+            if start_place_id is not None:
+                start_place = get_object_or_404(
+                    Place, pk=start_place_id, user=request.user, region=region
+                )
+                start_node_override = _find_nearest_node_at_distance(
+                    region_id, start_place.location.x, start_place.location.y
+                )
+
+            if end_place_id is not None and route_type == RouteType.ONE_WAY:
+                end_place = get_object_or_404(
+                    Place, pk=end_place_id, user=request.user, region=region
+                )
+                end_node_override = _find_nearest_node_at_distance(
+                    region_id, end_place.location.x, end_place.location.y
+                )
+
+            result = generate_route(
+                region_id,
+                target_distance_m,
+                route_type,
+                start_node_override=start_node_override,
+                end_node_override=end_node_override,
+            )
         except RouteGenerationError as exc:
             logger.warning("Route generation failed: %s", exc)
             return Response(

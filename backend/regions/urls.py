@@ -3,6 +3,7 @@
 from django.urls import path
 
 from paths.views import RegionPathsListView
+from places.views import PlaceDetailView, PlaceListCreateView
 from regions.views import RegionDetailView, RegionListView
 from routes.views import RouteGenerateView
 from users.views import (
@@ -35,6 +36,16 @@ urlpatterns = [
         "<int:region_id>/paths/<int:path_id>/walk/",
         PathWalkToggleView.as_view(),
         name="path-walk-toggle",
+    ),
+    path(
+        "<int:region_id>/places/",
+        PlaceListCreateView.as_view(),
+        name="place-list-create",
+    ),
+    path(
+        "<int:region_id>/places/<int:place_id>/",
+        PlaceDetailView.as_view(),
+        name="place-detail",
     ),
     path(
         "<int:region_id>/routes/generate/",

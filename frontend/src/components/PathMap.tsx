@@ -19,6 +19,7 @@ import type {
   PathFeature,
   PathFeatureCollection,
   RouteResponse,
+  Place,
 } from "@/types/geo";
 
 interface PathMapProps {
@@ -35,6 +36,11 @@ interface PathMapProps {
   selectedPathId?: number | null;
   onPathSelect?: (pathId: number) => void;
   onDeselectPath?: () => void;
+  places?: Place[];
+  showPlaces?: boolean;
+  isCreatingPlace?: boolean;
+  onPlaceCreate?: (location: [number, number]) => void;
+  onPlaceDelete?: () => void;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -235,6 +241,50 @@ function MapClickHandler({ onDeselect, skipRef }: { onDeselect?: () => void; ski
   return null;
 }
 
+function PlaceMarkers({
+  places,
+}: {
+  places: Place[];
+}) {
+  return (
+    <>
+      {places.map((place) => (
+        <CircleMarker
+          key={place.id}
+          center={[place.location[1], place.location[0]]}
+          radius={7}
+          pathOptions={{
+            fillColor: "#8b5cf6",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 1,
+          }}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
+            },
+          }}
+        >
+          <Tooltip>{place.name}</Tooltip>
+        </CircleMarker>
+      ))}
+    </>
+  );
+}
+
+function PlaceCreationHandler({
+  onPlaceCreate,
+}: {
+  onPlaceCreate: (location: [number, number]) => void;
+}) {
+  useMapEvents({
+    click: (e) => {
+      onPlaceCreate([e.latlng.lng, e.latlng.lat]);
+    },
+  });
+  return null;
+}
+
 export default function PathMap({
   region,
   paths,
@@ -248,6 +298,11 @@ export default function PathMap({
   selectedPathId,
   onPathSelect,
   onDeselectPath,
+  places,
+  showPlaces,
+  isCreatingPlace,
+  onPlaceCreate,
+  onPlaceDelete,
 }: PathMapProps) {
   const hasRoute = route && route.segments.features.length > 0;
   const totalSegments = hasRoute ? route.segments.features.length : 0;
@@ -384,7 +439,7 @@ export default function PathMap({
   }, [selectedPathId]);
 
   return (
-    <div className="relative h-full w-full">
+    <div className={`relative h-full w-full${isCreatingPlace ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
       <MapContainer
         center={[51.4, 21.1]}
         zoom={12}
@@ -398,6 +453,12 @@ export default function PathMap({
         <FitToPath focusedPathId={focusedPathId} paths={paths} onFocusHandled={onFocusHandled} />
         <MapRefSetter />
         <MapClickHandler onDeselect={onDeselectPath} skipRef={pathClickedRef} />
+        {isCreatingPlace && (
+          <PlaceCreationHandler onPlaceCreate={onPlaceCreate!} />
+        )}
+        {showPlaces && places && places.length > 0 && (
+          <PlaceMarkers places={places} />
+        )}
         {paths.features.length > 0 && (
           <GeoJSON
             key={`paths-${hasRoute ? "dimmed" : "normal"}`}

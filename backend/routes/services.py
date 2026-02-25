@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 LOOP_CLOSURE_TOLERANCE_M = 250
 RETRACE_PENALTY_FACTOR = 5.0
 LOOP_DISTANCE_FRACTION = 0.45
+PLACE_NODE_TARGET_DISTANCE_M = 300.0
 
 
 class RouteType(enum.StrEnum):
@@ -41,10 +42,68 @@ class RouteResult:
     is_loop: bool = False
 
 
+def _find_nearest_node_at_distance(
+    region_id: int,
+    place_lon: float,
+    place_lat: float,
+    target_distance_m: float = PLACE_NODE_TARGET_DISTANCE_M,
+) -> int:
+    """Find the network node closest to a target distance from a place.
+
+    Queries the segment topology nodes filtered by region and finds
+    the node whose geographic distance from the place is closest to
+    the target distance (default 300m), simulating a short walk to
+    the trail network.
+
+    Args:
+        region_id: The region to search nodes in.
+        place_lon: Longitude of the place.
+        place_lat: Latitude of the place.
+        target_distance_m: Target distance from place to node in meters.
+
+    Returns:
+        The best node ID.
+
+    Raises:
+        RouteGenerationError: If no nodes are found in the region.
+    """
+    safe_id = int(region_id)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, dist
+            FROM (
+                SELECT DISTINCT v.id,
+                    ST_Distance(
+                        v.the_geom::geography,
+                        ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography
+                    ) AS dist
+                FROM segments_vertices_pgr v
+                JOIN segments s ON (v.id = s.source OR v.id = s.target)
+                WHERE s.region_id = %s
+                    AND s.source IS NOT NULL
+                    AND s.target IS NOT NULL
+            ) sub
+            ORDER BY ABS(dist - %s)
+            LIMIT 1
+            """,
+            [place_lon, place_lat, safe_id, target_distance_m],
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        msg = f"No network nodes found in region {region_id} near the specified place."
+        raise RouteGenerationError(msg)
+    return row[0]
+
+
 def generate_route(
     region_id: int,
     target_distance_m: float,
     route_type: RouteType = RouteType.ONE_WAY,
+    *,
+    start_node_override: int | None = None,
+    end_node_override: int | None = None,
 ) -> RouteResult:
     """Generate a route in a region targeting a specific distance.
 
@@ -52,6 +111,9 @@ def generate_route(
         region_id: The region to generate a route in.
         target_distance_m: Target route distance in meters.
         route_type: Whether to generate a one-way or loop route.
+        start_node_override: If set, use this node instead of a random start.
+        end_node_override: If set, use this node instead of computed target
+            (one-way only).
 
     Returns:
         A RouteResult with ordered segment IDs and metadata.
@@ -68,9 +130,13 @@ def generate_route(
     )
     match route_type:
         case RouteType.ONE_WAY:
-            result = _generate_one_way_route(region_id, target_distance_m)
+            result = _generate_one_way_route(
+                region_id, target_distance_m, start_node_override, end_node_override
+            )
         case RouteType.LOOP:
-            result = _generate_loop_route(region_id, target_distance_m)
+            result = _generate_loop_route(
+                region_id, target_distance_m, start_node_override
+            )
     logger.info(
         "Route generated: %d segments, %.0fm, nodes %d->%d, is_loop=%s",
         len(result.segment_ids),
@@ -134,10 +200,20 @@ def get_route_path_names(segment_ids: list[int]) -> list[str]:
 def _generate_one_way_route(
     region_id: int,
     target_distance_m: float,
+    start_node_override: int | None = None,
+    end_node_override: int | None = None,
 ) -> RouteResult:
     """Generate a one-way route from a random source to a distant target."""
-    source_node = _pick_random_source_node(region_id)
-    target_node = _find_best_target_node(region_id, source_node, target_distance_m)
+    source_node = (
+        start_node_override
+        if start_node_override is not None
+        else _pick_random_source_node(region_id)
+    )
+    target_node = (
+        end_node_override
+        if end_node_override is not None
+        else _find_best_target_node(region_id, source_node, target_distance_m)
+    )
     result = _compute_shortest_path(region_id, source_node, target_node)
     start_point = _get_node_coordinates(source_node)
     end_point = _get_node_coordinates(target_node)
@@ -154,6 +230,7 @@ def _generate_one_way_route(
 def _generate_loop_route(
     region_id: int,
     target_distance_m: float,
+    start_node_override: int | None = None,
 ) -> RouteResult:
     """Generate a loop route that returns near the starting point.
 
@@ -166,6 +243,7 @@ def _generate_loop_route(
     Args:
         region_id: The region to route in.
         target_distance_m: Target total loop distance in meters.
+        start_node_override: If set, use this node as the loop start instead of random.
 
     Returns:
         A RouteResult with is_loop=True.
@@ -173,7 +251,11 @@ def _generate_loop_route(
     Raises:
         RouteGenerationError: If the loop cannot be formed.
     """
-    source_node = _pick_random_source_node(region_id)
+    source_node = (
+        start_node_override
+        if start_node_override is not None
+        else _pick_random_source_node(region_id)
+    )
     outbound_distance = target_distance_m * LOOP_DISTANCE_FRACTION
     target_node = _find_best_target_node(region_id, source_node, outbound_distance)
 
@@ -236,13 +318,15 @@ def _build_edges_sql(region_id: int) -> str:
         SQL string for use as pgRouting edges query.
     """
     safe_id = int(region_id)
-    return (
-        f"SELECT id, source, target, "
-        f"ST_Length(geometry::geography) AS cost, "
-        f"ST_Length(geometry::geography) AS reverse_cost "
-        f"FROM segments WHERE region_id = {safe_id} "
-        f"AND source IS NOT NULL AND target IS NOT NULL"
-    )
+    return f"""
+        SELECT id, source, target,
+            ST_Length(geometry::geography) AS cost,
+            ST_Length(geometry::geography) AS reverse_cost
+        FROM segments
+        WHERE region_id = {safe_id}
+            AND source IS NOT NULL
+            AND target IS NOT NULL
+    """
 
 
 def _build_penalized_edges_sql(
@@ -266,17 +350,21 @@ def _build_penalized_edges_sql(
     safe_id = int(region_id)
     safe_factor = float(penalty_factor)
     id_list = ", ".join(str(int(sid)) for sid in penalized_segment_ids)
-    return (
-        f"SELECT id, source, target, "
-        f"CASE WHEN id IN ({id_list}) "
-        f"THEN ST_Length(geometry::geography) * {safe_factor} "
-        f"ELSE ST_Length(geometry::geography) END AS cost, "
-        f"CASE WHEN id IN ({id_list}) "
-        f"THEN ST_Length(geometry::geography) * {safe_factor} "
-        f"ELSE ST_Length(geometry::geography) END AS reverse_cost "
-        f"FROM segments WHERE region_id = {safe_id} "
-        f"AND source IS NOT NULL AND target IS NOT NULL"
-    )
+    return f"""
+        SELECT id, source, target,
+            CASE WHEN id IN ({id_list})
+                THEN ST_Length(geometry::geography) * {safe_factor}
+                ELSE ST_Length(geometry::geography)
+            END AS cost,
+            CASE WHEN id IN ({id_list})
+                THEN ST_Length(geometry::geography) * {safe_factor}
+                ELSE ST_Length(geometry::geography)
+            END AS reverse_cost
+        FROM segments
+        WHERE region_id = {safe_id}
+            AND source IS NOT NULL
+            AND target IS NOT NULL
+    """
 
 
 def _compute_actual_distance(segment_ids: list[int]) -> float:
@@ -296,8 +384,11 @@ def _compute_actual_distance(segment_ids: list[int]) -> float:
     id_list = ", ".join(str(int(sid)) for sid in segment_ids)
     with connection.cursor() as cursor:
         cursor.execute(
-            f"SELECT SUM(ST_Length(geometry::geography)) "
-            f"FROM segments WHERE id IN ({id_list})"
+            f"""
+            SELECT SUM(ST_Length(geometry::geography))
+            FROM segments
+            WHERE id IN ({id_list})
+            """
         )
         row = cursor.fetchone()
     if row is None or row[0] is None:
@@ -320,9 +411,11 @@ def _compute_node_distance(node_a: int, node_b: int) -> float:
     safe_b = int(node_b)
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT ST_Distance(a.the_geom::geography, b.the_geom::geography) "
-            "FROM segments_vertices_pgr a, segments_vertices_pgr b "
-            "WHERE a.id = %s AND b.id = %s",
+            """
+            SELECT ST_Distance(a.the_geom::geography, b.the_geom::geography)
+            FROM segments_vertices_pgr a, segments_vertices_pgr b
+            WHERE a.id = %s AND b.id = %s
+            """,
             [safe_a, safe_b],
         )
         row = cursor.fetchone()
@@ -346,8 +439,11 @@ def _get_node_coordinates(node_id: int) -> tuple[float, float]:
     safe_id = int(node_id)
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT ST_X(the_geom), ST_Y(the_geom) "
-            "FROM segments_vertices_pgr WHERE id = %s",
+            """
+            SELECT ST_X(the_geom), ST_Y(the_geom)
+            FROM segments_vertices_pgr
+            WHERE id = %s
+            """,
             [safe_id],
         )
         row = cursor.fetchone()
@@ -411,22 +507,25 @@ def _find_best_target_node(
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT node, agg_cost FROM pgr_drivingDistance("
-            "  %s, %s, %s, directed := false"
-            ") WHERE node != %s "
-            "ORDER BY ABS(agg_cost - %s) LIMIT 1",
+            """
+            SELECT node, agg_cost
+            FROM pgr_drivingDistance(%s, %s, %s, directed := false)
+            WHERE node != %s
+            ORDER BY ABS(agg_cost - %s)
+            LIMIT 5
+            """,
             [edges_sql, source_node, max_cost, source_node, target_distance_m],
         )
-        row = cursor.fetchone()
+        rows = cursor.fetchall()
 
-    if row is None:
+    if not rows:
         msg = (
             f"No reachable nodes found within {max_cost:.0f}m "
             f"from node {source_node} in region {region_id}."
         )
         raise RouteGenerationError(msg)
 
-    return row[0]
+    return random.choice(rows)[0]
 
 
 def _compute_shortest_path(
@@ -456,9 +555,12 @@ def _compute_shortest_path(
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT edge, agg_cost FROM pgr_dijkstra("
-            "  %s, %s, %s, directed := false"
-            ") WHERE edge != -1 ORDER BY seq",
+            """
+            SELECT edge, agg_cost
+            FROM pgr_dijkstra(%s, %s, %s, directed := false)
+            WHERE edge != -1
+            ORDER BY seq
+            """,
             [edges_sql, source_node, target_node],
         )
         rows = cursor.fetchall()

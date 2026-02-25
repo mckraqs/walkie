@@ -67,6 +67,8 @@ export type RouteType = "one_way" | "loop";
 export interface RouteGenerateRequest {
   target_distance_km: number;
   route_type?: RouteType;
+  start_place_id?: number | null;
+  end_place_id?: number | null;
 }
 
 export interface RouteResponse {
@@ -89,4 +91,22 @@ export interface PathWalkToggleResponse {
   action: "walked" | "unwalked";
   walked_path_ids: number[];
   total_paths: number;
+}
+
+export interface Place {
+  id: number;
+  name: string;
+  location: [number, number];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlaceCreateRequest {
+  name: string;
+  location: [number, number];
+}
+
+export interface PlaceUpdateRequest {
+  name?: string;
+  location?: [number, number];
 }

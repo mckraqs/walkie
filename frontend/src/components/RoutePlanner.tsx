@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import type { RouteResponse, RouteType } from "@/types/geo";
+import type { RouteResponse, RouteType, Place } from "@/types/geo";
 
 interface RoutePlannerProps {
   route: RouteResponse | null;
   loading: boolean;
   error: string | null;
-  onGenerate: (distanceKm: number, routeType: RouteType) => void;
+  onGenerate: (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null) => void;
   onClear: () => void;
   isFavorite: boolean;
+  places?: Place[];
 }
 
 function formatDistance(meters: number): string {
@@ -26,16 +27,19 @@ export default function RoutePlanner({
   onGenerate,
   onClear,
   isFavorite,
+  places,
 }: RoutePlannerProps) {
   const [collapsed, setCollapsed] = useState(true);
   const [distance, setDistance] = useState("3");
   const [routeType, setRouteType] = useState<RouteType>("one_way");
+  const [startPlaceId, setStartPlaceId] = useState<number | null>(null);
+  const [endPlaceId, setEndPlaceId] = useState<number | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const km = parseFloat(distance);
     if (!isNaN(km) && km >= 0.1 && km <= 50) {
-      onGenerate(km, routeType);
+      onGenerate(km, routeType, startPlaceId, endPlaceId);
     }
   }
 
@@ -104,9 +108,11 @@ export default function RoutePlanner({
             <input
               type="checkbox"
               checked={routeType === "loop"}
-              onChange={(e) =>
-                setRouteType(e.target.checked ? "loop" : "one_way")
-              }
+              onChange={(e) => {
+                const isLoop = e.target.checked;
+                setRouteType(isLoop ? "loop" : "one_way");
+                if (isLoop) setEndPlaceId(null);
+              }}
               disabled={loading}
               className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800"
             />
@@ -114,6 +120,56 @@ export default function RoutePlanner({
               Loop route
             </span>
           </label>
+          {places && places.length > 0 && (
+            <div className="space-y-2">
+              <div>
+                <label
+                  htmlFor="start-place"
+                  className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+                >
+                  {routeType === "loop" ? "Start / Finish place" : "Start place"}
+                </label>
+                <select
+                  id="start-place"
+                  value={startPlaceId ?? ""}
+                  onChange={(e) => setStartPlaceId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={loading}
+                  className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                >
+                  <option value="">Random (default)</option>
+                  {places.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {routeType === "one_way" && (
+                <div>
+                  <label
+                    htmlFor="end-place"
+                    className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+                  >
+                    Finish place
+                  </label>
+                  <select
+                    id="end-place"
+                    value={endPlaceId ?? ""}
+                    onChange={(e) => setEndPlaceId(e.target.value ? Number(e.target.value) : null)}
+                    disabled={loading}
+                    className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                  >
+                    <option value="">Random (default)</option>
+                    {places.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
         </form>
 
         {error && (

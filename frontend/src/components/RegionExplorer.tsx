@@ -4,12 +4,14 @@ import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { generateRoute, togglePathWalk } from "@/lib/api";
 import RoutePlanner from "@/components/RoutePlanner";
+import PlaceNameDialog from "@/components/PlaceNameDialog";
 import PathList from "@/components/PathList";
 import type {
   RegionFeature,
   PathFeatureCollection,
   RouteResponse,
   RouteType,
+  Place,
 } from "@/types/geo";
 
 const PathMap = dynamic(() => import("@/components/PathMap"), { ssr: false });
@@ -22,6 +24,14 @@ interface RegionExplorerProps {
   walkedPathIds: Set<number>;
   showWalkedOnly: boolean;
   onWalkedChange: (walkedPathIds: number[], totalPaths: number) => void;
+  places: Place[];
+  showPlaces: boolean;
+  isCreatingPlace: boolean;
+  pendingPlaceLocation: [number, number] | null;
+  onPlaceCreate: (location: [number, number]) => void;
+  onPlaceCreated: () => void;
+  onPlaceDeleted: () => void;
+  onCancelPlaceCreation: () => void;
 }
 
 export default function RegionExplorer({
@@ -32,6 +42,14 @@ export default function RegionExplorer({
   walkedPathIds,
   showWalkedOnly,
   onWalkedChange,
+  places,
+  showPlaces,
+  isCreatingPlace,
+  pendingPlaceLocation,
+  onPlaceCreate,
+  onPlaceCreated,
+  onPlaceDeleted,
+  onCancelPlaceCreation,
 }: RegionExplorerProps) {
   const [route, setRoute] = useState<RouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,13 +68,15 @@ export default function RegionExplorer({
   const handleDeselectPath = useCallback(() => setSelectedPathId(null), []);
 
   const handleGenerate = useCallback(
-    async (distanceKm: number, routeType: RouteType) => {
+    async (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null) => {
       setLoading(true);
       setError(null);
       try {
         const result = await generateRoute(regionId, {
           target_distance_km: distanceKm,
           route_type: routeType,
+          start_place_id: startPlaceId,
+          end_place_id: endPlaceId,
         });
         setRoute(result);
       } catch (err) {
@@ -105,6 +125,7 @@ export default function RegionExplorer({
         onGenerate={handleGenerate}
         onClear={handleClear}
         isFavorite={isFavorite}
+        places={places}
       />
       <PathList
         paths={displayedPaths}
@@ -131,7 +152,20 @@ export default function RegionExplorer({
         selectedPathId={selectedPathId}
         onPathSelect={setSelectedPathId}
         onDeselectPath={handleDeselectPath}
+        places={places}
+        showPlaces={showPlaces}
+        isCreatingPlace={isCreatingPlace}
+        onPlaceCreate={onPlaceCreate}
+        onPlaceDelete={onPlaceDeleted}
       />
+      {pendingPlaceLocation && (
+        <PlaceNameDialog
+          regionId={regionId}
+          location={pendingPlaceLocation}
+          onCreated={onPlaceCreated}
+          onCancel={onCancelPlaceCreation}
+        />
+      )}
     </div>
   );
 }

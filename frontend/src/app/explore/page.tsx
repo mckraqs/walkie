@@ -10,6 +10,7 @@ import {
   addFavoriteRegion,
   removeFavoriteRegion,
   fetchWalkedPaths,
+  fetchPlaces,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import RegionExplorer from "@/components/RegionExplorer";
@@ -17,6 +18,7 @@ import type {
   RegionListItem,
   RegionFeature,
   PathFeatureCollection,
+  Place,
 } from "@/types/geo";
 
 export default function ExplorePage() {
@@ -36,6 +38,11 @@ export default function ExplorePage() {
   const [walkedPathIds, setWalkedPathIds] = useState<number[]>([]);
   const [totalPaths, setTotalPaths] = useState(0);
   const [showWalkedOnly, setShowWalkedOnly] = useState(false);
+
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [showPlaces, setShowPlaces] = useState(false);
+  const [isCreatingPlace, setIsCreatingPlace] = useState(false);
+  const [pendingPlaceLocation, setPendingPlaceLocation] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -98,9 +105,48 @@ export default function ExplorePage() {
       });
   }, [selectedRegionId, user, isFavorite]);
 
+  useEffect(() => {
+    if (!selectedRegionId || !user || !isFavorite) {
+      setPlaces([]);
+      setShowPlaces(false);
+      setIsCreatingPlace(false);
+      setPendingPlaceLocation(null);
+      return;
+    }
+    fetchPlaces(selectedRegionId)
+      .then(setPlaces)
+      .catch(() => setPlaces([]));
+  }, [selectedRegionId, user, isFavorite]);
+
   const handleWalkedChange = useCallback((newWalkedPathIds: number[], newTotalPaths: number) => {
     setWalkedPathIds(newWalkedPathIds);
     setTotalPaths(newTotalPaths);
+  }, []);
+
+  const handlePlaceCreate = useCallback((location: [number, number]) => {
+    setPendingPlaceLocation(location);
+  }, []);
+
+  const handlePlaceCreated = useCallback(() => {
+    setPendingPlaceLocation(null);
+    setIsCreatingPlace(false);
+    if (selectedRegionId) {
+      fetchPlaces(selectedRegionId)
+        .then(setPlaces)
+        .catch(() => setPlaces([]));
+    }
+  }, [selectedRegionId]);
+
+  const handlePlaceDeleted = useCallback(() => {
+    if (selectedRegionId) {
+      fetchPlaces(selectedRegionId)
+        .then(setPlaces)
+        .catch(() => setPlaces([]));
+    }
+  }, [selectedRegionId]);
+
+  const handleCancelPlaceCreation = useCallback(() => {
+    setPendingPlaceLocation(null);
   }, []);
 
   const districts = useMemo(
@@ -255,6 +301,33 @@ export default function ExplorePage() {
                 {walkedPathIds.length}/{totalPaths}{" "}
                 ({totalPaths > 0 ? Math.round((walkedPathIds.length / totalPaths) * 100) : 0}%)
               </span>
+              <button
+                type="button"
+                onClick={() => setShowPlaces((v) => !v)}
+                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
+                  showPlaces
+                    ? "border-purple-600 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-900/30 dark:text-purple-400"
+                    : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                }`}
+              >
+                Places
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingPlace((v) => {
+                    if (v) setPendingPlaceLocation(null);
+                    return !v;
+                  });
+                }}
+                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
+                  isCreatingPlace
+                    ? "border-purple-600 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-900/30 dark:text-purple-400"
+                    : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {isCreatingPlace ? "Cancel Pin" : "+ Place"}
+              </button>
             </>
           )}
         </div>
@@ -308,6 +381,14 @@ export default function ExplorePage() {
             walkedPathIds={new Set(walkedPathIds)}
             showWalkedOnly={showWalkedOnly}
             onWalkedChange={handleWalkedChange}
+            places={places}
+            showPlaces={showPlaces}
+            isCreatingPlace={isCreatingPlace}
+            pendingPlaceLocation={pendingPlaceLocation}
+            onPlaceCreate={handlePlaceCreate}
+            onPlaceCreated={handlePlaceCreated}
+            onPlaceDeleted={handlePlaceDeleted}
+            onCancelPlaceCreation={handleCancelPlaceCreation}
           />
         )}
       </div>

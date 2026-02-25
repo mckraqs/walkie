@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "paths",
     "routes",
     "users",
+    "places",
 ]
 
 MIDDLEWARE = [

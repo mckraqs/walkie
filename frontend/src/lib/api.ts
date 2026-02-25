@@ -9,6 +9,9 @@ import type {
   AuthUser,
   WalkedPathsResponse,
   PathWalkToggleResponse,
+  Place,
+  PlaceCreateRequest,
+  PlaceUpdateRequest,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -186,4 +189,71 @@ export async function togglePathWalk(regionId: string, pathId: number): Promise<
     throw new Error(`Failed to toggle path walk: ${res.status}`);
   }
   return res.json();
+}
+
+export async function fetchPlaces(regionId: string): Promise<Place[]> {
+  const res = await fetch(`${API_URL}/api/regions/${regionId}/places/`, {
+    cache: "no-store",
+    headers: authHeaders(),
+  });
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch places: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function createPlace(
+  regionId: string,
+  request: PlaceCreateRequest,
+): Promise<Place> {
+  const res = await fetch(`${API_URL}/api/regions/${regionId}/places/`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(request),
+  });
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to create place: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function updatePlace(
+  regionId: string,
+  placeId: number,
+  request: PlaceUpdateRequest,
+): Promise<Place> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/places/${placeId}/`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify(request),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to update place: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deletePlace(
+  regionId: string,
+  placeId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/places/${placeId}/`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to delete place: ${res.status}`);
+  }
 }

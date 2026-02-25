@@ -14,6 +14,12 @@ class RouteGenerateRequestSerializer(serializers.Serializer):
         choices=["one_way", "loop"],
         default="one_way",
     )
+    start_place_id = serializers.IntegerField(
+        required=False, default=None, allow_null=True
+    )
+    end_place_id = serializers.IntegerField(
+        required=False, default=None, allow_null=True
+    )
 
 
 class RouteSegmentSerializer(GeoFeatureModelSerializer):
