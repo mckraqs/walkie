@@ -424,8 +424,9 @@ export default function RegionExplorer({
       />
       <PathMap
         region={region}
-        paths={displayedPaths}
+        paths={paths}
         route={route}
+        showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
         walkedPathIds={walkedPathIds}

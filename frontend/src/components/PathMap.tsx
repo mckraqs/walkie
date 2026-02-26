@@ -50,6 +50,7 @@ interface PathMapProps {
   composerError?: string | null;
   composedStartPoint?: [number, number] | null;
   composedEndPoint?: [number, number] | null;
+  showWalkedOnly?: boolean;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -77,9 +78,21 @@ const SELECTED_STYLE: PathOptions = {
 };
 
 const WALKED_STYLE: PathOptions = {
-  color: "#22c55e",
-  weight: 3,
-  opacity: 0.8,
+  color: "#059669",
+  weight: 4,
+  opacity: 0.9,
+};
+
+const WALKED_HIGHLIGHT_STYLE: PathOptions = {
+  color: "#059669",
+  weight: 5,
+  opacity: 1.0,
+};
+
+const UNWALKED_DIMMED_STYLE: PathOptions = {
+  color: "#9ca3af",
+  weight: 2,
+  opacity: 0.3,
 };
 
 const ROUTE_HOVER_STYLE: PathOptions = {
@@ -337,6 +350,7 @@ export default function PathMap({
   composerError,
   composedStartPoint,
   composedEndPoint,
+  showWalkedOnly,
 }: PathMapProps) {
   const hasRoute = composing || (route && route.segments.features.length > 0);
   const totalSegments = hasRoute && route ? route.segments.features.length : 0;
@@ -399,6 +413,8 @@ export default function PathMap({
   onSegmentClickRef.current = onSegmentClick;
   const selectedSegmentIdsRef = useRef(selectedSegmentIds);
   selectedSegmentIdsRef.current = selectedSegmentIds;
+  const showWalkedOnlyRef = useRef(showWalkedOnly);
+  showWalkedOnlyRef.current = showWalkedOnly;
   const composingRef = useRef(composing);
   composingRef.current = composing;
 
@@ -422,7 +438,10 @@ export default function PathMap({
 
   function getBaseStyle(pathId: number): PathOptions {
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
-    if (walkedPathIdsRef.current?.has(pathId)) return WALKED_STYLE;
+    const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
+    if (showWalkedOnlyRef.current && walked) return WALKED_HIGHLIGHT_STYLE;
+    if (showWalkedOnlyRef.current && !walked) return UNWALKED_DIMMED_STYLE;
+    if (walked) return WALKED_STYLE;
     return PATH_STYLE;
   }
 
@@ -460,7 +479,7 @@ export default function PathMap({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walkedPathIds, hasRoute]);
+  }, [walkedPathIds, hasRoute, showWalkedOnly]);
 
   // External hover drives style (highlight all siblings)
   useEffect(() => {
