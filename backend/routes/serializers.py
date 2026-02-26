@@ -26,6 +26,7 @@ class RouteSegmentSerializer(GeoFeatureModelSerializer):
     """Serialize a segment in a generated route as a GeoJSON Feature."""
 
     sequence_index = serializers.IntegerField(read_only=True)
+    path_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         """Meta options for RouteSegmentSerializer."""
@@ -41,6 +42,7 @@ class RouteSegmentSerializer(GeoFeatureModelSerializer):
             "is_lit",
             "created_at",
             "sequence_index",
+            "path_id",
         )
 
 

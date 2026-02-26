@@ -97,7 +97,7 @@ const UNWALKED_DIMMED_STYLE: PathOptions = {
 
 const ROUTE_HOVER_STYLE: PathOptions = {
   color: "#d97706",
-  weight: 6,
+  weight: 5,
   opacity: 1,
 };
 
@@ -355,6 +355,7 @@ export default function PathMap({
   const hasRoute = composing || (route && route.segments.features.length > 0);
   const totalSegments = hasRoute && route ? route.segments.features.length : 0;
   const layerMapRef = useRef<Map<number, L.Path>>(new Map());
+  const routePathLayersRef = useRef<Map<string, { layer: L.Path; color: string }[]>>(new Map());
   const mapRef = useRef<L.Map | null>(null);
 
   function MapRefSetter() {
@@ -388,6 +389,27 @@ export default function PathMap({
     }
     return result;
   }, [paths]);
+
+  // Map each route segment id to a contiguous-name run group key
+  const routeRunGroupMap = useMemo(() => {
+    const map = new Map<number, string>();
+    if (!route) return map;
+    const features = route.segments.features;
+    const sorted = [...features].sort(
+      (a, b) => (a.properties.sequence_index ?? 0) - (b.properties.sequence_index ?? 0),
+    );
+    let runIndex = 0;
+    let prevName: string | null = null;
+    for (const f of sorted) {
+      const name = f.properties.name || "";
+      if (name !== prevName) {
+        runIndex++;
+        prevName = name;
+      }
+      map.set(f.id, `run-${runIndex}`);
+    }
+    return map;
+  }, [route]);
 
   // Refs to avoid stale closures in onEachFeature callbacks
   const walkedPathIdsRef = useRef(walkedPathIds);
@@ -667,11 +689,13 @@ export default function PathMap({
                 const color = getSegmentColor(seqIdx, totalSegments);
                 return {
                   color,
-                  weight: 5,
+                  weight: 4,
                   opacity: 0.9,
+                  className: 'route-segment',
                 };
               }}
               onEachFeature={(feature, layer: Layer) => {
+                const featureId = (feature as PathFeature).id;
                 const props = (feature as PathFeature).properties;
                 const seqIdx = props.sequence_index ?? 0;
                 const segmentColor = getSegmentColor(seqIdx, totalSegments);
@@ -679,16 +703,50 @@ export default function PathMap({
                   buildRouteTooltip(props, totalSegments),
                   { sticky: true },
                 );
+
+                const runKey = routeRunGroupMap.get(featureId);
+                if (runKey != null) {
+                  let group = routePathLayersRef.current.get(runKey);
+                  if (!group) {
+                    group = [];
+                    routePathLayersRef.current.set(runKey, group);
+                  }
+                  group.push({ layer: layer as L.Path, color: segmentColor });
+                }
+
                 layer.on({
-                  mouseover: (e) => {
-                    (e.target as L.Path).setStyle(ROUTE_HOVER_STYLE);
+                  mouseover: () => {
+                    if (runKey != null) {
+                      const group = routePathLayersRef.current.get(runKey);
+                      if (group) {
+                        for (const entry of group) {
+                          entry.layer.setStyle(ROUTE_HOVER_STYLE);
+                          entry.layer.bringToFront();
+                        }
+                      }
+                    } else {
+                      (layer as L.Path).setStyle(ROUTE_HOVER_STYLE);
+                    }
                   },
-                  mouseout: (e) => {
-                    (e.target as L.Path).setStyle({
-                      color: segmentColor,
-                      weight: 5,
-                      opacity: 0.9,
-                    });
+                  mouseout: () => {
+                    if (runKey != null) {
+                      const group = routePathLayersRef.current.get(runKey);
+                      if (group) {
+                        for (const entry of group) {
+                          entry.layer.setStyle({
+                            color: entry.color,
+                            weight: 4,
+                            opacity: 0.9,
+                          });
+                        }
+                      }
+                    } else {
+                      (layer as L.Path).setStyle({
+                        color: segmentColor,
+                        weight: 4,
+                        opacity: 0.9,
+                      });
+                    }
                   },
                 });
               }}

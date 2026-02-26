@@ -7,7 +7,7 @@ import random
 from dataclasses import dataclass
 
 from django.db import connection
-from django.db.models import Case, IntegerField, QuerySet, When
+from django.db.models import Case, IntegerField, OuterRef, QuerySet, Subquery, When
 
 from paths.models import PathSegment, Segment
 
@@ -162,9 +162,12 @@ def get_route_segments(segment_ids: list[int]) -> QuerySet[Segment]:
         *[When(pk=pk, then=pos) for pos, pk in enumerate(segment_ids)],
         output_field=IntegerField(),
     )
+    path_id_subquery = Subquery(
+        PathSegment.objects.filter(segment=OuterRef("pk")).values("path_id")[:1]
+    )
     return (
         Segment.objects.filter(pk__in=segment_ids)
-        .annotate(sequence_index=ordering)
+        .annotate(sequence_index=ordering, path_id=path_id_subquery)
         .order_by(ordering)
     )
 

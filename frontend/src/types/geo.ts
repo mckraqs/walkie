@@ -32,6 +32,7 @@ export interface PathProperties {
   is_lit: boolean;
   created_at: string;
   sequence_index?: number;
+  path_id?: number;
 }
 
 export interface RegionFeature {
