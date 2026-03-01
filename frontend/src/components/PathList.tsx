@@ -8,9 +8,7 @@ interface PathListProps {
   isFavorite: boolean;
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
-  selectedPathId: number | null;
   onPathHover: (pathId: number | null) => void;
-  onPathClick: (pathId: number) => void;
   onToggleWalk: (pathId: number) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -23,9 +21,7 @@ export default function PathList({
   isFavorite,
   showWalkedOnly,
   hoveredPathId,
-  selectedPathId,
   onPathHover,
-  onPathClick,
   onToggleWalk,
   collapsed,
   onToggleCollapsed,
@@ -71,26 +67,19 @@ export default function PathList({
             {visiblePaths.map((path) => {
               const isWalked = walkedPathIds.has(path.id);
               const isHovered = hoveredPathId === path.id;
-              const isSelected = selectedPathId === path.id;
 
               return (
                 <li
                   key={path.id}
                   className={`flex items-center justify-between rounded px-2 py-1.5 text-sm transition-colors ${
-                    isSelected
-                      ? "bg-blue-100 dark:bg-blue-900"
-                      : isHovered
-                        ? "bg-zinc-100 dark:bg-zinc-800"
-                        : ""
+                    isHovered
+                      ? "bg-zinc-100 dark:bg-zinc-800"
+                      : ""
                   }`}
                   onMouseEnter={() => onPathHover(path.id)}
                   onMouseLeave={() => onPathHover(null)}
                 >
-                  <button
-                    type="button"
-                    onClick={() => onPathClick(path.id)}
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
-                  >
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     {isWalked && (
                       <span
                         className="inline-block h-2 w-2 flex-shrink-0 rounded-full bg-green-500"
@@ -103,7 +92,7 @@ export default function PathList({
                     <span className="flex-shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                       {path.properties.category}
                     </span>
-                  </button>
+                  </div>
                   {isFavorite && (
                     <button
                       type="button"

@@ -46,9 +46,7 @@ interface SidePanelProps {
   walkedPathIds: Set<number>;
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
-  selectedPathId: number | null;
   onPathHover: (pathId: number | null) => void;
-  onPathClick: (pathId: number) => void;
   onToggleWalk: (pathId: number) => void;
 }
 
@@ -104,9 +102,7 @@ export default function SidePanel({
   walkedPathIds,
   showWalkedOnly,
   hoveredPathId,
-  selectedPathId,
   onPathHover,
-  onPathClick,
   onToggleWalk,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
@@ -194,9 +190,7 @@ export default function SidePanel({
             isFavorite={isFavorite}
             showWalkedOnly={showWalkedOnly}
             hoveredPathId={hoveredPathId}
-            selectedPathId={selectedPathId}
             onPathHover={onPathHover}
-            onPathClick={onPathClick}
             onToggleWalk={onToggleWalk}
             collapsed={pathListCollapsed}
             onToggleCollapsed={() => setPathListCollapsed((c) => !c)}

@@ -98,8 +98,6 @@ export default function RegionExplorer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredPathId, setHoveredPathId] = useState<number | null>(null);
-  const [focusedPathId, setFocusedPathId] = useState<number | null>(null);
-  const [selectedPathId, setSelectedPathId] = useState<number | null>(null);
   const [savedRoutes, setSavedRoutes] = useState<RouteListItem[]>([]);
   const [activeRouteId, setActiveRouteId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
@@ -154,15 +152,6 @@ export default function RegionExplorer({
     },
     [regionId, activeRouteId],
   );
-
-  const handleFocusHandled = useCallback(() => setFocusedPathId(null), []);
-
-  const handlePathClickFromList = useCallback((pathId: number) => {
-    setSelectedPathId(pathId);
-    setFocusedPathId(pathId);
-  }, []);
-
-  const handleDeselectPath = useCallback(() => setSelectedPathId(null), []);
 
   const handleGenerate = useCallback(
     async (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null) => {
@@ -417,9 +406,7 @@ export default function RegionExplorer({
         walkedPathIds={walkedPathIds}
         showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
-        selectedPathId={selectedPathId}
         onPathHover={setHoveredPathId}
-        onPathClick={handlePathClickFromList}
         onToggleWalk={handleToggleWalk}
       />
       <PathMap
@@ -432,11 +419,6 @@ export default function RegionExplorer({
         walkedPathIds={walkedPathIds}
         onToggleWalk={handleToggleWalk}
         isFavorite={isFavorite}
-        focusedPathId={focusedPathId}
-        onFocusHandled={handleFocusHandled}
-        selectedPathId={selectedPathId}
-        onPathSelect={setSelectedPathId}
-        onDeselectPath={handleDeselectPath}
         places={places}
         showPlaces={showPlaces}
         isCreatingPlace={isCreatingPlace}

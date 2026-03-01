@@ -33,11 +33,6 @@ interface PathMapProps {
   walkedPathIds?: Set<number>;
   onToggleWalk?: (pathId: number) => void;
   isFavorite?: boolean;
-  focusedPathId?: number | null;
-  onFocusHandled?: () => void;
-  selectedPathId?: number | null;
-  onPathSelect?: (pathId: number) => void;
-  onDeselectPath?: () => void;
   places?: Place[];
   showPlaces?: boolean;
   isCreatingPlace?: boolean;
@@ -68,12 +63,6 @@ const PATH_DIMMED_STYLE: PathOptions = {
 const HOVER_STYLE: PathOptions = {
   color: "#1d4ed8",
   weight: 5,
-  opacity: 1,
-};
-
-const SELECTED_STYLE: PathOptions = {
-  color: "#f97316",
-  weight: 6,
   opacity: 1,
 };
 
@@ -217,34 +206,6 @@ function RouteMarkers({ route }: { route: RouteResponse }) {
   );
 }
 
-function FitToPath({
-  focusedPathId,
-  paths,
-  onFocusHandled,
-}: {
-  focusedPathId: number | null | undefined;
-  paths: PathFeatureCollection;
-  onFocusHandled?: () => void;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (focusedPathId == null) return;
-
-    const feature = paths.features.find((f) => f.id === focusedPathId);
-    if (!feature) return;
-
-    const bounds = L.geoJSON(feature.geometry).getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
-    }
-
-    onFocusHandled?.();
-  }, [map, focusedPathId, paths, onFocusHandled]);
-
-  return null;
-}
-
 function FitBounds({ region, paths, route }: PathMapProps) {
   const map = useMap();
 
@@ -263,21 +224,6 @@ function FitBounds({ region, paths, route }: PathMapProps) {
     }
   }, [map, region, paths, route]);
 
-  return null;
-}
-
-function MapClickHandler({ onDeselect, skipRef }: { onDeselect?: () => void; skipRef: React.RefObject<boolean> }) {
-  const ref = useRef(onDeselect);
-  ref.current = onDeselect;
-  useMapEvents({
-    click: () => {
-      if (skipRef.current) {
-        skipRef.current = false;
-        return;
-      }
-      ref.current?.();
-    },
-  });
   return null;
 }
 
@@ -333,11 +279,6 @@ export default function PathMap({
   onPathHover,
   walkedPathIds,
   isFavorite,
-  focusedPathId,
-  onFocusHandled,
-  selectedPathId,
-  onPathSelect,
-  onDeselectPath,
   places,
   showPlaces,
   isCreatingPlace,
@@ -418,14 +359,8 @@ export default function PathMap({
   hasRouteRef.current = hasRoute;
   const onPathHoverRef = useRef(onPathHover);
   onPathHoverRef.current = onPathHover;
-  const selectedPathIdRef = useRef(selectedPathId);
-  selectedPathIdRef.current = selectedPathId;
-  const onPathSelectRef = useRef(onPathSelect);
-  onPathSelectRef.current = onPathSelect;
   const siblingIdsMapRef = useRef(siblingIdsMap);
   siblingIdsMapRef.current = siblingIdsMap;
-  const selectionFromMapRef = useRef(false);
-  const pathClickedRef = useRef(false);
 
   // Composition mode state and refs
   const [rejectedSegmentId, setRejectedSegmentId] = useState<number | null>(null);
@@ -450,7 +385,6 @@ export default function PathMap({
     pathId: number;
     props: PathFeature["properties"];
     fromTable?: boolean;
-    pinned?: boolean;
   } | null>(null);
   const tooltipPosRef = useRef({ x: 0, y: 0 });
   const tooltipElRef = useRef<HTMLDivElement>(null);
@@ -487,7 +421,6 @@ export default function PathMap({
     if (!siblings) return;
     for (const sid of siblings) {
       if (sid === pathId) continue;
-      if (selectedPathIdRef.current === sid) continue;
       const layer = layerMapRef.current.get(sid);
       if (layer) layer.setStyle(getBaseStyle(sid));
     }
@@ -496,7 +429,7 @@ export default function PathMap({
   // Imperative style update when walkedPathIds changes
   useEffect(() => {
     layerMapRef.current.forEach((layer, pathId) => {
-      if (pathId !== hoveredPathId && pathId !== selectedPathId) {
+      if (pathId !== hoveredPathId) {
         layer.setStyle(getBaseStyle(pathId));
       }
     });
@@ -513,8 +446,8 @@ export default function PathMap({
     layer.bringToFront();
     setSiblingsStyle(hoveredPathId, HOVER_STYLE);
 
-    // Show tooltip at path center (favorite only, no selection active)
-    if (selectedPathId == null && isFavorite && hoveredPathIdRef.current !== hoveredPathId && mapRef.current) {
+    // Show tooltip at path center (favorite only, from list hover)
+    if (isFavorite && hoveredPathIdRef.current !== hoveredPathId && mapRef.current) {
       const feature = pathFeatureMap.get(hoveredPathId);
       if (feature) {
         const center = L.geoJSON(feature.geometry).getBounds().getCenter();
@@ -525,55 +458,14 @@ export default function PathMap({
     }
 
     return () => {
-      if (selectedPathId != null && hoveredPathId === selectedPathId) {
-        layer.setStyle(SELECTED_STYLE);
-      } else {
-        layer.setStyle(getBaseStyle(hoveredPathId));
-      }
+      layer.setStyle(getBaseStyle(hoveredPathId));
       resetSiblingsStyle(hoveredPathId);
-      // Clear tooltip only if no selection and no active map hover
-      if (selectedPathId == null && hoveredPathIdRef.current == null) {
+      if (hoveredPathIdRef.current == null) {
         setTooltipData(null);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoveredPathId, selectedPathId, isFavorite, pathFeatureMap]);
-
-  // Selected path styling and pinned tooltip
-  useEffect(() => {
-    // Clear previous selection styles (skip hovered path)
-    layerMapRef.current.forEach((layer, pathId) => {
-      if (pathId !== hoveredPathId) {
-        layer.setStyle(getBaseStyle(pathId));
-      }
-    });
-
-    if (selectedPathId == null) {
-      setTooltipData((prev) => (prev?.pinned ? null : prev));
-      return;
-    }
-
-    const layer = layerMapRef.current.get(selectedPathId);
-    if (layer) {
-      layer.setStyle(SELECTED_STYLE);
-      layer.bringToFront();
-    }
-    setSiblingsStyle(selectedPathId, SELECTED_STYLE);
-
-    const feature = pathFeatureMap.get(selectedPathId);
-    if (selectionFromMapRef.current) {
-      selectionFromMapRef.current = false;
-      if (feature) {
-        setTooltipData({ pathId: selectedPathId, props: feature.properties, pinned: true });
-      }
-    } else if (feature && mapRef.current) {
-      const center = L.geoJSON(feature.geometry).getBounds().getCenter();
-      const pt = mapRef.current.latLngToContainerPoint(center);
-      tooltipPosRef.current = { x: pt.x + 12, y: pt.y - 12 };
-      setTooltipData({ pathId: selectedPathId, props: feature.properties, pinned: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPathId]);
+  }, [hoveredPathId, isFavorite, pathFeatureMap]);
 
   return (
     <div className={`relative h-full w-full${isCreatingPlace ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
@@ -587,9 +479,7 @@ export default function PathMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds region={region} paths={paths} route={route} />
-        <FitToPath focusedPathId={focusedPathId} paths={paths} onFocusHandled={onFocusHandled} />
         <MapRefSetter />
-        <MapClickHandler onDeselect={onDeselectPath} skipRef={pathClickedRef} />
         {isCreatingPlace && (
           <PlaceCreationHandler onPlaceCreate={onPlaceCreate!} />
         )}
@@ -612,10 +502,12 @@ export default function PathMap({
               layerMapRef.current.set(pathId, layer as L.Path);
 
               layer.on({
-                click: (e) => {
-                  if (composingRef.current) return;
-                  if (hasRouteRef.current) return;
-                  pathClickedRef.current = true;
+                mouseover: (e) => {
+                  clearTimeout(hideTimerRef.current);
+                  hoveredPathIdRef.current = pathId;
+                  (e.target as L.Path).setStyle(getHoverStyle());
+                  setSiblingsStyle(pathId, getHoverStyle());
+                  onPathHoverRef.current?.(pathId);
                   const containerPoint = (
                     e as L.LeafletMouseEvent
                   ).containerPoint;
@@ -623,31 +515,9 @@ export default function PathMap({
                     x: containerPoint.x + 12,
                     y: containerPoint.y - 12,
                   };
-                  setTooltipData({ pathId, props, pinned: true });
-                  if (selectedPathIdRef.current !== pathId) {
-                    selectionFromMapRef.current = true;
-                    onPathSelectRef.current?.(pathId);
-                  }
-                },
-                mouseover: (e) => {
-                  clearTimeout(hideTimerRef.current);
-                  hoveredPathIdRef.current = pathId;
-                  (e.target as L.Path).setStyle(getHoverStyle());
-                  setSiblingsStyle(pathId, getHoverStyle());
-                  onPathHoverRef.current?.(pathId);
-                  if (selectedPathIdRef.current == null) {
-                    const containerPoint = (
-                      e as L.LeafletMouseEvent
-                    ).containerPoint;
-                    tooltipPosRef.current = {
-                      x: containerPoint.x + 12,
-                      y: containerPoint.y - 12,
-                    };
-                    setTooltipData({ pathId, props });
-                  }
+                  setTooltipData({ pathId, props });
                 },
                 mousemove: (e) => {
-                  if (selectedPathIdRef.current != null) return;
                   if (tooltipElRef.current) {
                     const containerPoint = (
                       e as L.LeafletMouseEvent
@@ -660,19 +530,13 @@ export default function PathMap({
                   }
                 },
                 mouseout: (e) => {
-                  if (selectedPathIdRef.current === pathId) {
-                    (e.target as L.Path).setStyle(SELECTED_STYLE);
-                  } else {
-                    (e.target as L.Path).setStyle(getBaseStyle(pathId));
-                  }
+                  (e.target as L.Path).setStyle(getBaseStyle(pathId));
                   resetSiblingsStyle(pathId);
                   hoveredPathIdRef.current = null;
                   onPathHoverRef.current?.(null);
-                  if (selectedPathIdRef.current == null) {
-                    hideTimerRef.current = setTimeout(() => {
-                      setTooltipData(null);
-                    }, 150);
-                  }
+                  hideTimerRef.current = setTimeout(() => {
+                    setTooltipData(null);
+                  }, 150);
                 },
               });
             }}
