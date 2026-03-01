@@ -118,7 +118,7 @@ export default function RoutePlanner({
               disabled={loading || !isFavorite}
               className="mt-5 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? "..." : "Generate"}
+              {loading ? "..." : "Plan"}
             </button>
           </div>
 
@@ -296,6 +296,7 @@ export default function RoutePlanner({
                           end_point: route.end_point,
                         });
                         setShowSaveInput(false);
+                        onClear();
                       } catch (err) {
                         setSaveError(
                           err instanceof Error ? err.message : "Failed to save route",
