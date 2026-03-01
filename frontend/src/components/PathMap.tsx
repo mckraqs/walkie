@@ -702,16 +702,8 @@ export default function PathMap({
             Surface: {tooltipData.props.surface || "unknown"}
           </div>
           <div className="text-zinc-600 dark:text-zinc-400">
-            Accessible: {tooltipData.props.accessible ? "Yes" : "No"}
-          </div>
-          <div className="text-zinc-600 dark:text-zinc-400">
             Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
           </div>
-          {isFavorite && !tooltipData.fromTable && (
-            <div className="text-zinc-600 dark:text-zinc-400">
-              Walked: {walkedPathIds?.has(tooltipData.pathId) ? "Yes" : "No"}
-            </div>
-          )}
         </div>
       )}
     </div>
