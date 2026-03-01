@@ -78,9 +78,9 @@ const WALKED_HIGHLIGHT_STYLE: PathOptions = {
 };
 
 const UNWALKED_DIMMED_STYLE: PathOptions = {
-  color: "#9ca3af",
-  weight: 2,
-  opacity: 0.3,
+  color: "#60a5fa",
+  weight: 3,
+  opacity: 0.8,
 };
 
 const ROUTE_HOVER_STYLE: PathOptions = {
