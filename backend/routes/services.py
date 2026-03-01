@@ -14,6 +14,7 @@ from paths.models import PathSegment, Segment
 logger = logging.getLogger(__name__)
 
 LOOP_CLOSURE_TOLERANCE_M = 250
+PROXIMITY_TOLERANCE_M = 100
 RETRACE_PENALTY_FACTOR = 5.0
 LOOP_DISTANCE_FRACTION = 0.45
 PLACE_NODE_TARGET_DISTANCE_M = 300.0
@@ -218,18 +219,19 @@ def get_route_path_ids(segment_ids: list[int]) -> list[int]:
 
 
 def validate_segment_connectivity(segment_ids: list[int]) -> bool:
-    """Check that a sequence of segments forms a connected topology chain.
+    """Check that a sequence of segments forms a connected chain.
 
-    For each consecutive pair of segments, verifies that they share at least
-    one topology node (i.e. one segment's source or target matches the other's
-    source or target).
+    For each consecutive pair of segments, first checks if they share a
+    topology node. If not, falls back to a PostGIS geographic distance check
+    across all four endpoint combinations (start/end of each segment). Pairs
+    within ``PROXIMITY_TOLERANCE_M`` are accepted as connected.
 
     Args:
         segment_ids: Ordered list of segment IDs to validate.
 
     Returns:
-        True if all consecutive pairs are topologically connected, or if the
-        list has fewer than two elements. False if any gap is found.
+        True if all consecutive pairs are connected (topologically or by
+        proximity), or if the list has fewer than two elements.
     """
     if len(segment_ids) < 2:
         return True
@@ -241,6 +243,9 @@ def validate_segment_connectivity(segment_ids: list[int]) -> bool:
         ).values_list("id", "source", "target")
     }
 
+    # Collect pairs that need a proximity check
+    proximity_pairs: list[tuple[int, int]] = []
+
     for a_id, b_id in itertools.pairwise(segment_ids):
         a = nodes.get(a_id)
         b = nodes.get(b_id)
@@ -249,9 +254,62 @@ def validate_segment_connectivity(segment_ids: list[int]) -> bool:
         a_nodes = {n for n in a if n is not None}
         b_nodes = {n for n in b if n is not None}
         if not a_nodes.intersection(b_nodes):
-            return False
+            proximity_pairs.append((a_id, b_id))
 
-    return True
+    if not proximity_pairs:
+        return True
+
+    # Fall back to PostGIS distance check for non-topology-connected pairs
+    return all(_segments_within_proximity(a_id, b_id) for a_id, b_id in proximity_pairs)
+
+
+def _segments_within_proximity(seg_a_id: int, seg_b_id: int) -> bool:
+    """Check if two segments have endpoints within proximity tolerance.
+
+    Computes the geographic distance between all four combinations of
+    segment endpoints (start/end of A vs start/end of B) and returns
+    True if the minimum distance is within ``PROXIMITY_TOLERANCE_M``.
+
+    Args:
+        seg_a_id: First segment ID.
+        seg_b_id: Second segment ID.
+
+    Returns:
+        True if the closest pair of endpoints is within tolerance.
+    """
+    safe_a = int(seg_a_id)
+    safe_b = int(seg_b_id)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT LEAST(
+                ST_Distance(
+                    ST_StartPoint(a.geometry)::geography,
+                    ST_StartPoint(b.geometry)::geography
+                ),
+                ST_Distance(
+                    ST_StartPoint(a.geometry)::geography,
+                    ST_EndPoint(b.geometry)::geography
+                ),
+                ST_Distance(
+                    ST_EndPoint(a.geometry)::geography,
+                    ST_StartPoint(b.geometry)::geography
+                ),
+                ST_Distance(
+                    ST_EndPoint(a.geometry)::geography,
+                    ST_EndPoint(b.geometry)::geography
+                )
+            ) AS min_dist
+            FROM segments a, segments b
+            WHERE a.id = %s AND b.id = %s
+            """,
+            [safe_a, safe_b],
+        )
+        row = cursor.fetchone()
+
+    if row is None or row[0] is None:
+        return False
+    return float(row[0]) <= PROXIMITY_TOLERANCE_M
 
 
 def _generate_one_way_route(

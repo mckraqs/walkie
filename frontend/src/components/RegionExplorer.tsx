@@ -28,6 +28,50 @@ import type {
 
 const PathMap = dynamic(() => import("@/components/PathMap"), { ssr: false });
 
+const PROXIMITY_TOLERANCE_M = 100;
+
+function haversineDistance(a: [number, number], b: [number, number]): number {
+  const R = 6_371_000; // Earth radius in meters
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+  const h = sinLat * sinLat + Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * sinLon * sinLon;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function getEndpointCoords(
+  segIds: number[],
+  segMap: Map<number, SegmentFeature>,
+): { start: [number, number] | null; end: [number, number] | null } {
+  if (segIds.length === 0) return { start: null, end: null };
+
+  const { startNode, endNode } = getRouteEndpoints(segIds, segMap);
+
+  const first = segMap.get(segIds[0]);
+  let start: [number, number] | null = null;
+  if (first) {
+    const coords = first.geometry.coordinates;
+    start =
+      startNode === first.properties.target
+        ? (coords[coords.length - 1] as [number, number])
+        : (coords[0] as [number, number]);
+  }
+
+  const last = segMap.get(segIds[segIds.length - 1]);
+  let end: [number, number] | null = null;
+  if (last) {
+    const coords = last.geometry.coordinates;
+    end =
+      endNode === last.properties.source
+        ? (coords[0] as [number, number])
+        : (coords[coords.length - 1] as [number, number]);
+  }
+
+  return { start, end };
+}
+
 function getRouteEndpoints(
   segIds: number[],
   segMap: Map<number, SegmentFeature>,
@@ -300,13 +344,37 @@ export default function RegionExplorer({
       const { startNode, endNode } = getRouteEndpoints(prev, segmentMap);
       const newNodes = [newSeg.properties.source, newSeg.properties.target];
 
-      // Check if new segment connects to end
+      // Check if new segment connects to end (topology)
       if (endNode !== null && newNodes.includes(endNode)) {
         return [...prev, segmentId];
       }
-      // Check if new segment connects to start
+      // Check if new segment connects to start (topology)
       if (startNode !== null && newNodes.includes(startNode)) {
         return [segmentId, ...prev];
+      }
+
+      // Topology check failed -- fall back to proximity check
+      const { start: routeStart, end: routeEnd } = getEndpointCoords(prev, segmentMap);
+      const newCoords = newSeg.geometry.coordinates;
+      const newSource = newCoords[0] as [number, number];
+      const newTarget = newCoords[newCoords.length - 1] as [number, number];
+
+      // Check if new segment is within proximity of route end (append)
+      if (routeEnd) {
+        const dEndSrc = haversineDistance(routeEnd, newSource);
+        const dEndTgt = haversineDistance(routeEnd, newTarget);
+        if (dEndSrc <= PROXIMITY_TOLERANCE_M || dEndTgt <= PROXIMITY_TOLERANCE_M) {
+          return [...prev, segmentId];
+        }
+      }
+
+      // Check if new segment is within proximity of route start (prepend)
+      if (routeStart) {
+        const dStartSrc = haversineDistance(routeStart, newSource);
+        const dStartTgt = haversineDistance(routeStart, newTarget);
+        if (dStartSrc <= PROXIMITY_TOLERANCE_M || dStartTgt <= PROXIMITY_TOLERANCE_M) {
+          return [segmentId, ...prev];
+        }
       }
 
       // Not connected - reject
