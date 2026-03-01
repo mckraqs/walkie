@@ -2,9 +2,8 @@
 
 from typing import ClassVar
 
-from django.contrib.gis.db.models.functions import Length
 from django.db import transaction
-from django.db.models import Case, F, FloatField, QuerySet, Sum, Value, When
+from django.db.models import Case, F, FloatField, Func, QuerySet, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -22,6 +21,14 @@ from regions.serializers import RegionListItemSerializer
 from routes.models import Route
 from users.models import FavoriteRegion
 from users.serializers import LoginSerializer, UserSerializer
+
+
+class _GeographyLength(Func):  # type: ignore[type-arg]
+    """ST_Length with explicit geography cast for meter-based results."""
+
+    function = "ST_Length"
+    template = "%(function)s(%(expressions)s::geography)"
+    output_field = FloatField()  # type: ignore[assignment]
 
 
 class LoginView(APIView):
@@ -173,34 +180,71 @@ class FavoriteRegionToggleView(APIView):
         )
 
 
-def _get_walked_path_ids(user: object, region: Region) -> list[int]:
-    """Return IDs of paths where at least half the segment length is walked.
+class WalkedPathsResult:
+    """Result of the walked-paths coverage calculation."""
+
+    __slots__ = ("path_ids", "total_count", "walked_count")
+
+    def __init__(
+        self, path_ids: list[int], walked_count: int, total_count: int
+    ) -> None:
+        """Initialize with path IDs and progress counts.
+
+        Args:
+            path_ids: Individual path record IDs for map highlighting.
+            walked_count: Unique walked street names plus unnamed paths.
+            total_count: Unique street names plus unnamed paths in region.
+        """
+        self.path_ids = path_ids
+        self.walked_count = walked_count
+        self.total_count = total_count
+
+
+def _get_walked_paths(user: object, region: Region) -> WalkedPathsResult:
+    """Return walked-path IDs and unique-street progress counts.
 
     Named paths (non-empty name) are aggregated by street name so that
     multiple Path records for the same street are evaluated together.
     Unnamed paths are evaluated individually to avoid grouping unrelated paths.
+
+    The progress counts (``walked_count`` / ``total_count``) count unique
+    street names for named paths and individual records for unnamed paths,
+    so the counter reflects distinct streets rather than database records.
 
     Args:
         user: The authenticated user.
         region: The region to query.
 
     Returns:
-        Sorted list of path IDs meeting the coverage threshold.
+        WalkedPathsResult with path IDs for map highlighting and counts
+        for the progress counter.
     """
+    total_unique_names = (
+        Path.objects.filter(region=region)
+        .exclude(name="")
+        .values("name")
+        .distinct()
+        .count()
+    )
+    total_unnamed = Path.objects.filter(region=region, name="").count()
+    total_count = total_unique_names + total_unnamed
+
     walked_routes = Route.objects.filter(user=user, region=region, walked=True)
     walked_segment_ids: set[int] = set()
     for route in walked_routes:
         walked_segment_ids.update(route.segment_ids)
 
     if not walked_segment_ids:
-        return []
+        return WalkedPathsResult(path_ids=[], walked_count=0, total_count=total_count)
+
+    segment_length = _GeographyLength("segment__geometry")
 
     walked_length_expr = Coalesce(
         Sum(
             Case(
                 When(
                     segment_id__in=walked_segment_ids,
-                    then=Length("segment__geometry"),
+                    then=segment_length,
                 ),
             ),
         ),
@@ -214,7 +258,7 @@ def _get_walked_path_ids(user: object, region: Region) -> list[int]:
         .exclude(path__name="")
         .values("path__name")
         .annotate(
-            total_length=Sum(Length("segment__geometry")),
+            total_length=Sum(segment_length),
             walked_length=walked_length_expr,
         )
         .filter(walked_length__gte=F("total_length") / 2)
@@ -231,14 +275,18 @@ def _get_walked_path_ids(user: object, region: Region) -> list[int]:
         PathSegment.objects.filter(path__region=region, path__name="")
         .values("path_id")
         .annotate(
-            total_length=Sum(Length("segment__geometry")),
+            total_length=Sum(segment_length),
             walked_length=walked_length_expr,
         )
         .filter(walked_length__gte=F("total_length") / 2)
     )
     unnamed_ids = [row["path_id"] for row in unnamed_coverage]
 
-    return sorted(set(named_ids) | set(unnamed_ids))
+    return WalkedPathsResult(
+        path_ids=sorted(set(named_ids) | set(unnamed_ids)),
+        walked_count=len(walked_names) + len(unnamed_ids),
+        total_count=total_count,
+    )
 
 
 class WalkedPathsListView(APIView):
@@ -260,9 +308,12 @@ class WalkedPathsListView(APIView):
                 {"detail": "Access restricted to your favorite regions."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        walked_path_ids = _get_walked_path_ids(request.user, region)
-        total_paths = Path.objects.filter(region=region).count()
+        result = _get_walked_paths(request.user, region)
         return Response(
-            {"walked_path_ids": walked_path_ids, "total_paths": total_paths},
+            {
+                "walked_path_ids": result.path_ids,
+                "total_paths": result.total_count,
+                "walked_count": result.walked_count,
+            },
             status=status.HTTP_200_OK,
         )

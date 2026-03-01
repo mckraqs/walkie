@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from paths.models import Path, Segment
+from paths.models import Segment
 from places.models import Place
 from regions.models import Region
 from routes.models import Route
@@ -32,7 +32,7 @@ from routes.services import (
     validate_segment_connectivity,
 )
 from users.models import FavoriteRegion
-from users.views import _get_walked_path_ids
+from users.views import _get_walked_paths
 
 logger = logging.getLogger(__name__)
 
@@ -337,15 +337,15 @@ class RouteWalkToggleView(APIView):
         route.walked = not route.walked
         route.save(update_fields=["walked"])
 
-        walked_path_ids = _get_walked_path_ids(request.user, region)
-        total_paths = Path.objects.filter(region=region).count()
+        result = _get_walked_paths(request.user, region)
 
         return Response(
             {
                 "id": route.id,
                 "walked": route.walked,
-                "walked_path_ids": walked_path_ids,
-                "total_paths": total_paths,
+                "walked_path_ids": result.path_ids,
+                "total_paths": result.total_count,
+                "walked_count": result.walked_count,
             }
         )
 

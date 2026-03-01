@@ -109,7 +109,7 @@ interface RegionExplorerProps {
   isFavorite: boolean;
   walkedPathIds: Set<number>;
   showWalkedOnly: boolean;
-  onWalkedChange: (walkedPathIds: number[], totalPaths: number) => void;
+  onWalkedChange: (walkedPathIds: number[], totalPaths: number, walkedCount: number) => void;
   places: Place[];
   showPlaces: boolean;
   isCreatingPlace: boolean;
@@ -242,7 +242,7 @@ export default function RegionExplorer({
         setSavedRoutes((prev) =>
           prev.map((r) => (r.id === result.id ? { ...r, walked: result.walked } : r)),
         );
-        onWalkedChange(result.walked_path_ids, result.total_paths);
+        onWalkedChange(result.walked_path_ids, result.total_paths, result.walked_count);
       } catch {
         // Silently handle
       }

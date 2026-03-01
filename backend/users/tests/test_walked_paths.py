@@ -336,9 +336,11 @@ class TestGetWalkedPathIds:
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
-        walked = response.json()["walked_path_ids"]
-        assert path_a.pk in walked
-        assert path_b.pk in walked
+        data = response.json()
+        assert path_a.pk in data["walked_path_ids"]
+        assert path_b.pk in data["walked_path_ids"]
+        # Counter counts unique street names, not individual Path records
+        assert data["walked_count"] == 1
         _ = segs_b  # referenced to satisfy linter
 
     def test_siblings_below_threshold(
@@ -409,13 +411,46 @@ class TestGetWalkedPathIds:
         assert path_a.pk in walked
         assert path_b.pk not in walked
 
-    def test_total_paths_counts_individual_records(
+    def test_low_coverage_not_walked_many_segments(
+        self,
+        auth_client: APIClient,
+        user: User,
+        region: Region,
+        favorite: FavoriteRegion,
+    ) -> None:
+        """10 equal segments with only 1 walked (10%) must NOT be walked.
+
+        Regression: a unit mismatch (meters vs degrees) between walked_length
+        and total_length caused any touched path to pass the 50% threshold.
+        """
+        step = 0.07
+        coords = [
+            [(20.0 + i * step, 50.0), (20.0 + (i + 1) * step, 50.0)] for i in range(10)
+        ]
+        path, segments = _create_path_with_segments(region, "Long Street", coords)
+
+        # Walk only the first segment -- 10% coverage, well below 50%
+        Route.objects.create(
+            user=user,
+            region=region,
+            name="Short Walk",
+            segment_ids=[segments[0].pk],
+            total_distance=100,
+            walked=True,
+        )
+
+        response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
+
+        assert response.status_code == 200
+        assert path.pk not in response.json()["walked_path_ids"]
+
+    def test_total_paths_counts_unique_names(
         self,
         auth_client: APIClient,
         region: Region,
         favorite: FavoriteRegion,
     ) -> None:
-        """total_paths counts individual Path records, not distinct names."""
+        """total_paths counts unique street names, not individual records."""
         _create_path_with_segments(region, "Komunalna", [[(20.0, 50.0), (20.3, 50.3)]])
         _create_path_with_segments(region, "Komunalna", [[(20.3, 50.3), (20.6, 50.6)]])
         _create_path_with_segments(region, "Inna", [[(20.6, 50.6), (21.0, 51.0)]])
@@ -423,7 +458,7 @@ class TestGetWalkedPathIds:
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
         assert response.status_code == 200
-        assert response.json()["total_paths"] == 3
+        assert response.json()["total_paths"] == 2
 
 
 @pytest.mark.django_db

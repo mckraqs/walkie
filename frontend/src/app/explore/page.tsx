@@ -39,6 +39,7 @@ export default function ExplorePage() {
 
   const [walkedPathIds, setWalkedPathIds] = useState<number[]>([]);
   const [totalPaths, setTotalPaths] = useState(0);
+  const [walkedCount, setWalkedCount] = useState(0);
   const [showWalkedOnly, setShowWalkedOnly] = useState(false);
 
   const [places, setPlaces] = useState<Place[]>([]);
@@ -93,6 +94,7 @@ export default function ExplorePage() {
       Promise.resolve().then(() => {
         setWalkedPathIds([]);
         setTotalPaths(0);
+        setWalkedCount(0);
         setShowWalkedOnly(false);
       });
       return;
@@ -101,10 +103,12 @@ export default function ExplorePage() {
       .then((data) => {
         setWalkedPathIds(data.walked_path_ids);
         setTotalPaths(data.total_paths);
+        setWalkedCount(data.walked_count);
       })
       .catch(() => {
         setWalkedPathIds([]);
         setTotalPaths(0);
+        setWalkedCount(0);
       });
   }, [selectedRegionId, user, isFavorite]);
 
@@ -121,9 +125,10 @@ export default function ExplorePage() {
       .catch(() => setPlaces([]));
   }, [selectedRegionId, user, isFavorite]);
 
-  const handleWalkedChange = useCallback((newWalkedPathIds: number[], newTotalPaths: number) => {
+  const handleWalkedChange = useCallback((newWalkedPathIds: number[], newTotalPaths: number, newWalkedCount: number) => {
     setWalkedPathIds(newWalkedPathIds);
     setTotalPaths(newTotalPaths);
+    setWalkedCount(newWalkedCount);
   }, []);
 
   const handlePlaceCreate = useCallback((location: [number, number]) => {
@@ -228,10 +233,12 @@ export default function ExplorePage() {
         .then((data) => {
           setWalkedPathIds(data.walked_path_ids);
           setTotalPaths(data.total_paths);
+          setWalkedCount(data.walked_count);
         })
         .catch(() => {
           setWalkedPathIds([]);
           setTotalPaths(0);
+          setWalkedCount(0);
         });
     } catch {
       // Silently handle
@@ -343,8 +350,8 @@ export default function ExplorePage() {
                 Walked
               </button>
               <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                {walkedPathIds.length}/{totalPaths}{" "}
-                ({totalPaths > 0 ? Math.round((walkedPathIds.length / totalPaths) * 100) : 0}%)
+                {walkedCount}/{totalPaths}{" "}
+                ({totalPaths > 0 ? Math.round((walkedCount / totalPaths) * 100) : 0}%)
               </span>
               <button
                 type="button"
