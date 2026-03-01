@@ -213,8 +213,17 @@ function RouteMarkers({ route }: { route: RouteResponse }) {
 
 function FitBounds({ region, paths, route }: PathMapProps) {
   const map = useMap();
+  const prevRouteRef = useRef<RouteResponse | null | undefined>(undefined);
 
   useEffect(() => {
+    const prevRoute = prevRouteRef.current;
+    prevRouteRef.current = route ?? null;
+
+    // Route cleared (non-null -> null): keep current view
+    if (prevRoute && !route) {
+      return;
+    }
+
     const fitTarget =
       route && route.segments.features.length > 0
         ? route.segments
@@ -228,6 +237,56 @@ function FitBounds({ region, paths, route }: PathMapProps) {
       map.fitBounds(bounds, { padding });
     }
   }, [map, region, paths, route]);
+
+  return null;
+}
+
+function ResetViewControl({ region, paths }: { region: RegionFeature; paths: PathFeatureCollection }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const control = new L.Control({ position: "topleft" });
+
+    control.onAdd = () => {
+      const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+      const button = L.DomUtil.create("a", "", container);
+      button.innerHTML = "&#8634;";
+      button.title = "Reset view";
+      button.href = "#";
+      button.role = "button";
+      button.setAttribute("aria-label", "Reset view");
+      Object.assign(button.style, {
+        fontSize: "18px",
+        fontWeight: "bold",
+        lineHeight: "26px",
+        textAlign: "center",
+        textDecoration: "none",
+        cursor: "pointer",
+        width: "30px",
+        height: "30px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      });
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.on(button, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        const fitTarget = paths.features.length > 0 ? paths : region.geometry;
+        const bounds = L.geoJSON(fitTarget).getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [20, 20] });
+        }
+      });
+
+      return container;
+    };
+
+    control.addTo(map);
+    return () => {
+      control.remove();
+    };
+  }, [map, region, paths]);
 
   return null;
 }
@@ -497,6 +556,7 @@ export default function PathMap({
         />
         <FitBounds region={region} paths={paths} route={route} />
         <MapRefSetter />
+        <ResetViewControl region={region} paths={paths} />
         {isCreatingPlace && (
           <PlaceCreationHandler onPlaceCreate={onPlaceCreate!} />
         )}
