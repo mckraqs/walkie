@@ -138,7 +138,7 @@ def _build_parent_admin_query(relation_id: int, admin_level: int) -> str:
     return (
         f"[out:json][timeout:{OVERPASS_TIMEOUT}];"
         f"relation({relation_id});"
-        f'<<;relation["admin_level"="{admin_level}"];'
+        f'<<;relation._["admin_level"="{admin_level}"];'
         f"out tags;"
     )
 
