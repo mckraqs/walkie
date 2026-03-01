@@ -7,6 +7,7 @@ from places.views import PlaceDetailView, PlaceListCreateView
 from regions.views import RegionDetailView, RegionListView
 from routes.views import (
     RouteDetailView,
+    RouteExportView,
     RouteGenerateView,
     RouteListCreateView,
     RouteWalkToggleView,
@@ -70,5 +71,10 @@ urlpatterns = [
         "<int:region_id>/routes/saved/<int:route_id>/walk/",
         RouteWalkToggleView.as_view(),
         name="route-walk-toggle",
+    ),
+    path(
+        "<int:region_id>/routes/saved/<int:route_id>/export/",
+        RouteExportView.as_view(),
+        name="route-export",
     ),
 ]

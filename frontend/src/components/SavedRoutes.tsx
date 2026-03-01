@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { downloadRouteFile } from "@/lib/gpx";
 import type { RouteListItem, RouteResponse } from "@/types/geo";
 
 interface SavedRoutesProps {
@@ -248,6 +249,16 @@ export default function SavedRoutes({
                           Loop
                         </span>
                       )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadRouteFile(loadedRouteDetails, route.name, "gpx");
+                        }}
+                        className="mt-1 rounded border border-zinc-300 px-2 py-0.5 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                      >
+                        Download GPX
+                      </button>
                     </div>
                   </div>
                 )}

@@ -2,6 +2,7 @@
 
 import logging
 
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.request import Request
@@ -23,6 +24,8 @@ from routes.services import (
     RouteGenerationError,
     RouteType,
     _find_nearest_node_at_distance,
+    build_gpx_xml,
+    build_kml_xml,
     generate_route,
     get_route_path_names,
     get_route_segments,
@@ -345,3 +348,51 @@ class RouteWalkToggleView(APIView):
                 "total_paths": total_paths,
             }
         )
+
+
+class RouteExportView(APIView):
+    """Export a saved route as GPX or KML."""
+
+    def get(self, request: Request, region_id: int, route_id: int) -> HttpResponse:
+        """Export a saved route in GPX or KML format.
+
+        Args:
+            request: The authenticated HTTP request.
+            region_id: The region primary key.
+            route_id: The saved route primary key.
+
+        Returns:
+            File download response with GPX or KML content.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
+
+        export_format = request.query_params.get("export_format", "gpx").lower()
+        if export_format not in ("gpx", "kml"):
+            return Response(
+                {"detail": "Invalid format. Use 'gpx' or 'kml'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        segments = get_route_segments(route.segment_ids)
+
+        if export_format == "kml":
+            xml_content = build_kml_xml(route.name, segments)
+            content_type = "application/vnd.google-earth.kml+xml"
+            extension = "kml"
+        else:
+            xml_content = build_gpx_xml(route.name, segments)
+            content_type = "application/gpx+xml"
+            extension = "gpx"
+
+        response = HttpResponse(xml_content, content_type=content_type)
+        response["Content-Disposition"] = (
+            f'attachment; filename="{route.name}.{extension}"'
+        )
+        return response

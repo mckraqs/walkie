@@ -19,6 +19,7 @@ from routes.services import (
     generate_route,
     get_route_path_names,
     get_route_segments,
+    stitch_segment_coordinates,
     validate_segment_connectivity,
 )
 from users.models import FavoriteRegion
@@ -1348,3 +1349,201 @@ class TestRouteRenameView:
         )
 
         assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestRouteExport:
+    """Tests for the GET .../export/ endpoint and segment stitching."""
+
+    def _export_url(self, region_pk: int, route_pk: int) -> str:
+        return f"/api/regions/{region_pk}/routes/saved/{route_pk}/export/"
+
+    def test_export_gpx_success(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """Valid GPX response with correct content type and parseable XML."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, route.pk) + "?export_format=gpx",
+        )
+
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/gpx+xml"
+        assert f"{route.name}.gpx" in response["Content-Disposition"]
+
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(response.content)
+        ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
+        trkpts = root.findall(".//gpx:trkseg/gpx:trkpt", ns)
+        assert len(trkpts) > 0
+        for pt in trkpts:
+            assert "lat" in pt.attrib
+            assert "lon" in pt.attrib
+
+    def test_export_kml_success(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """Valid KML response with correct content type and parseable XML."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, route.pk) + "?export_format=kml",
+        )
+
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/vnd.google-earth.kml+xml"
+        assert f"{route.name}.kml" in response["Content-Disposition"]
+
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(response.content)
+        ns = {"kml": "http://www.opengis.net/kml/2.2"}
+        coords_elem = root.find(".//kml:LineString/kml:coordinates", ns)
+        assert coords_elem is not None
+        assert coords_elem.text is not None
+        coord_triplets = coords_elem.text.strip().split()
+        assert len(coord_triplets) > 0
+
+    def test_export_default_format_is_gpx(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """No format param returns GPX."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, route.pk),
+        )
+
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/gpx+xml"
+
+    def test_export_invalid_format(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """Returns 400 for invalid format."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, route.pk) + "?export_format=csv",
+        )
+
+        assert response.status_code == 400
+
+    def test_export_requires_auth(
+        self,
+        region_with_topology: Region,
+        user: User,
+    ) -> None:
+        """401 for unauthenticated request."""
+        route = _create_saved_route(user, region_with_topology)
+        client = APIClient()
+
+        response = client.get(
+            self._export_url(region_with_topology.pk, route.pk),
+        )
+
+        assert response.status_code == 401
+
+    def test_export_requires_favorite_region(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """403 when region is not a favorite."""
+        route = _create_saved_route(user, region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, route.pk),
+        )
+
+        assert response.status_code == 403
+
+    def test_export_nonexistent_route(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """404 for nonexistent route."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, 999999),
+        )
+
+        assert response.status_code == 404
+
+    def test_export_other_users_route(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """404 when trying to export another user's route."""
+        other_user = User.objects.create_user(
+            username="exportother", password="otherpass123"
+        )
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        route = _create_saved_route(other_user, region_with_topology)
+
+        response = auth_client.get(
+            self._export_url(region_with_topology.pk, route.pk),
+        )
+
+        assert response.status_code == 404
+
+    def test_segment_stitching_reversal(
+        self,
+        region_with_topology: Region,
+    ) -> None:
+        """Segments needing reversal are stitched correctly."""
+        # Create two segments where the second is stored in reverse direction
+        # Segment A: (20.0, 50.0) -> (20.001, 50.0)
+        # Segment B: (20.002, 50.0) -> (20.001, 50.0)  -- stored reversed
+        seg_a = Segment.objects.create(
+            region=region_with_topology,
+            name="Stitch A",
+            geometry=GEOSGeometry(
+                "LINESTRING(20.000 50.000, 20.001 50.000)", srid=4326
+            ),
+            category="footway",
+            surface="asphalt",
+        )
+        seg_b = Segment.objects.create(
+            region=region_with_topology,
+            name="Stitch B",
+            geometry=GEOSGeometry(
+                "LINESTRING(20.002 50.000, 20.001 50.000)", srid=4326
+            ),
+            category="footway",
+            surface="asphalt",
+        )
+
+        segments_qs = Segment.objects.filter(pk__in=[seg_a.pk, seg_b.pk]).order_by("pk")
+        coords = stitch_segment_coordinates(segments_qs)
+
+        # After stitching, segment B should be reversed so coordinates flow
+        # left to right: (20.0, 50.0), (20.001, 50.0), (20.002, 50.0)
+        assert len(coords) == 3
+        assert coords[0] == (20.0, 50.0)
+        assert coords[1] == (20.001, 50.0)
+        assert coords[2] == (20.002, 50.0)

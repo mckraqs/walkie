@@ -3,7 +3,9 @@
 import enum
 import itertools
 import logging
+import math
 import random
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
 from django.db import connection
@@ -216,6 +218,105 @@ def get_route_path_ids(segment_ids: list[int]) -> list[int]:
         .values_list("path_id", flat=True)
         .distinct()
     )
+
+
+def stitch_segment_coordinates(
+    segments: QuerySet[Segment],
+) -> list[tuple[float, float]]:
+    """Merge ordered segment geometries into a single coordinate list.
+
+    For each segment after the first, compares its endpoints to the last
+    accumulated coordinate to determine whether the segment needs reversing.
+    Duplicate junction points are skipped.
+
+    Args:
+        segments: Ordered queryset of Segment objects.
+
+    Returns:
+        List of (lon, lat) coordinate tuples forming one continuous line.
+    """
+    coords: list[tuple[float, float]] = []
+    for segment in segments:
+        seg_coords = list(segment.geometry.coords)
+        if not coords:
+            coords.extend(seg_coords)
+            continue
+
+        last = coords[-1]
+        first_pt = seg_coords[0]
+        last_pt = seg_coords[-1]
+
+        dist_to_first = math.hypot(last[0] - first_pt[0], last[1] - first_pt[1])
+        dist_to_last = math.hypot(last[0] - last_pt[0], last[1] - last_pt[1])
+
+        if dist_to_last < dist_to_first:
+            seg_coords = list(reversed(seg_coords))
+
+        # Skip duplicate junction point
+        if seg_coords[0] == last:
+            seg_coords = seg_coords[1:]
+
+        coords.extend(seg_coords)
+    return coords
+
+
+def build_gpx_xml(name: str, segments: QuerySet[Segment]) -> str:
+    """Build a GPX 1.1 XML document from a route name and ordered segments.
+
+    Args:
+        name: Route display name.
+        segments: Ordered queryset of Segment objects.
+
+    Returns:
+        UTF-8 XML string representing a GPX track.
+    """
+    coords = stitch_segment_coordinates(segments)
+
+    gpx = ET.Element("gpx")
+    gpx.set("version", "1.1")
+    gpx.set("creator", "Walkie")
+    gpx.set("xmlns", "http://www.topografix.com/GPX/1/1")
+
+    metadata = ET.SubElement(gpx, "metadata")
+    ET.SubElement(metadata, "name").text = name
+
+    trk = ET.SubElement(gpx, "trk")
+    ET.SubElement(trk, "name").text = name
+    trkseg = ET.SubElement(trk, "trkseg")
+
+    for lon, lat in coords:
+        trkpt = ET.SubElement(trkseg, "trkpt")
+        trkpt.set("lat", str(lat))
+        trkpt.set("lon", str(lon))
+
+    return ET.tostring(gpx, encoding="unicode", xml_declaration=True)
+
+
+def build_kml_xml(name: str, segments: QuerySet[Segment]) -> str:
+    """Build a KML 2.2 XML document from a route name and ordered segments.
+
+    Args:
+        name: Route display name.
+        segments: Ordered queryset of Segment objects.
+
+    Returns:
+        UTF-8 XML string representing a KML document with a LineString.
+    """
+    coords = stitch_segment_coordinates(segments)
+
+    kml = ET.Element("kml")
+    kml.set("xmlns", "http://www.opengis.net/kml/2.2")
+
+    document = ET.SubElement(kml, "Document")
+    ET.SubElement(document, "name").text = name
+
+    placemark = ET.SubElement(document, "Placemark")
+    ET.SubElement(placemark, "name").text = name
+    linestring = ET.SubElement(placemark, "LineString")
+    coord_text = " ".join(f"{lon},{lat},0" for lon, lat in coords)
+    ET.SubElement(linestring, "coordinates").text = coord_text
+
+    return ET.tostring(kml, encoding="unicode", xml_declaration=True)
 
 
 def validate_segment_connectivity(segment_ids: list[int]) -> bool:

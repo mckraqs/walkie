@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { downloadRouteFile } from "@/lib/gpx";
 import type {
   RouteResponse,
   RouteType,
@@ -252,6 +253,22 @@ export default function RoutePlanner({
                 Save Route
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                const names = route.path_names;
+                const defaultName =
+                  names.length > 1
+                    ? `${names[0]} -> ${names[names.length - 1]}`
+                    : names.length === 1
+                      ? names[0]
+                      : "My Route";
+                downloadRouteFile(route, defaultName, "gpx");
+              }}
+              className="mt-1 w-full rounded border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            >
+              Download GPX
+            </button>
             {showSaveInput && (
               <div className="mt-2 space-y-1">
                 <input
