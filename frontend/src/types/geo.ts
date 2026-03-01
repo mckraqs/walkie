@@ -111,13 +111,6 @@ export interface WalkedPathsResponse {
   total_paths: number;
 }
 
-export interface PathWalkToggleResponse {
-  path_id: number;
-  action: "walked" | "unwalked";
-  walked_path_ids: number[];
-  total_paths: number;
-}
-
 export interface Place {
   id: number;
   name: string;

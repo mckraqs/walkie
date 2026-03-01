@@ -31,7 +31,6 @@ interface PathMapProps {
   hoveredPathId?: number | null;
   onPathHover?: (pathId: number | null) => void;
   walkedPathIds?: Set<number>;
-  onToggleWalk?: (pathId: number) => void;
   isFavorite?: boolean;
   places?: Place[];
   showPlaces?: boolean;

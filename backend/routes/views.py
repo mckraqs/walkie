@@ -24,12 +24,11 @@ from routes.services import (
     RouteType,
     _find_nearest_node_at_distance,
     generate_route,
-    get_route_path_ids,
     get_route_path_names,
     get_route_segments,
     validate_segment_connectivity,
 )
-from users.models import FavoriteRegion, PathWalkAction, PathWalkLog
+from users.models import FavoriteRegion
 from users.views import _get_walked_path_ids
 
 logger = logging.getLogger(__name__)
@@ -334,27 +333,6 @@ class RouteWalkToggleView(APIView):
         route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
         route.walked = not route.walked
         route.save(update_fields=["walked"])
-
-        path_ids = get_route_path_ids(route.segment_ids)
-        target_action = (
-            PathWalkAction.WALKED if route.walked else PathWalkAction.UNWALKED
-        )
-        for path_id in path_ids:
-            latest_log = (
-                PathWalkLog.objects.filter(user=request.user, path_id=path_id)
-                .order_by("-created_at")
-                .first()
-            )
-            current_action = (
-                latest_log.action if latest_log else PathWalkAction.UNWALKED
-            )
-            if current_action != target_action:
-                PathWalkLog.objects.create(
-                    user=request.user,
-                    path_id=path_id,
-                    region=region,
-                    action=target_action,
-                )
 
         walked_path_ids = _get_walked_path_ids(request.user, region)
         total_paths = Path.objects.filter(region=region).count()

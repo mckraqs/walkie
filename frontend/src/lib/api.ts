@@ -9,7 +9,6 @@ import type {
   LoginResponse,
   AuthUser,
   WalkedPathsResponse,
-  PathWalkToggleResponse,
   Place,
   PlaceCreateRequest,
   PlaceUpdateRequest,
@@ -194,18 +193,6 @@ export async function fetchWalkedPaths(regionId: string): Promise<WalkedPathsRes
   handle401(res);
   if (!res.ok) {
     throw new Error(`Failed to fetch walked paths: ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function togglePathWalk(regionId: string, pathId: number): Promise<PathWalkToggleResponse> {
-  const res = await fetch(`${API_URL}/api/regions/${regionId}/paths/${pathId}/walk/`, {
-    method: "POST",
-    headers: authHeaders(),
-  });
-  handle401(res);
-  if (!res.ok) {
-    throw new Error(`Failed to toggle path walk: ${res.status}`);
   }
   return res.json();
 }

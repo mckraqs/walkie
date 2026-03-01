@@ -187,7 +187,6 @@ export default function SidePanel({
           <PathList
             paths={paths}
             walkedPathIds={walkedPathIds}
-            isFavorite={isFavorite}
             showWalkedOnly={showWalkedOnly}
             hoveredPathId={hoveredPathId}
             onPathHover={onPathHover}

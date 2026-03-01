@@ -14,7 +14,6 @@ from routes.views import (
 from users.views import (
     FavoriteRegionListView,
     FavoriteRegionToggleView,
-    PathWalkToggleView,
     WalkedPathsListView,
 )
 
@@ -41,11 +40,6 @@ urlpatterns = [
         "<int:region_id>/paths/walked/",
         WalkedPathsListView.as_view(),
         name="walked-paths-list",
-    ),
-    path(
-        "<int:region_id>/paths/<int:path_id>/walk/",
-        PathWalkToggleView.as_view(),
-        name="path-walk-toggle",
     ),
     path(
         "<int:region_id>/places/",

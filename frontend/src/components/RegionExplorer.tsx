@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   generateRoute,
-  togglePathWalk,
   toggleRouteWalked,
   saveRoute,
   fetchSavedRoutes,
@@ -213,18 +212,6 @@ export default function RegionExplorer({
     setError(null);
   }, []);
 
-  const handleToggleWalk = useCallback(
-    async (pathId: number) => {
-      try {
-        const response = await togglePathWalk(regionId, pathId);
-        onWalkedChange(response.walked_path_ids, response.total_paths);
-      } catch {
-        // Silently handle
-      }
-    },
-    [regionId, onWalkedChange],
-  );
-
   // --- Composition: segment lookup map ---
   const segmentMap = useMemo(() => {
     if (!segments) return new Map<number, SegmentFeature>();
@@ -417,7 +404,6 @@ export default function RegionExplorer({
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
         walkedPathIds={walkedPathIds}
-        onToggleWalk={handleToggleWalk}
         isFavorite={isFavorite}
         places={places}
         showPlaces={showPlaces}

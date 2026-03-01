@@ -5,7 +5,6 @@ import type { PathFeature } from "@/types/geo";
 interface PathListProps {
   paths: PathFeature[];
   walkedPathIds: Set<number>;
-  isFavorite: boolean;
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
@@ -18,7 +17,6 @@ interface PathListProps {
 export default function PathList({
   paths,
   walkedPathIds,
-  isFavorite,
   showWalkedOnly,
   hoveredPathId,
   onPathHover,
