@@ -394,7 +394,7 @@ export default function RegionExplorer({
         showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
-        onToggleWalk={handleToggleWalk}
+
       />
       <PathMap
         region={region}

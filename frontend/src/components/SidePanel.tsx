@@ -47,7 +47,7 @@ interface SidePanelProps {
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
-  onToggleWalk: (pathId: number) => void;
+
 }
 
 function computeSectionHeight(
@@ -103,7 +103,6 @@ export default function SidePanel({
   showWalkedOnly,
   hoveredPathId,
   onPathHover,
-  onToggleWalk,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
@@ -190,7 +189,7 @@ export default function SidePanel({
             showWalkedOnly={showWalkedOnly}
             hoveredPathId={hoveredPathId}
             onPathHover={onPathHover}
-            onToggleWalk={onToggleWalk}
+
             collapsed={pathListCollapsed}
             onToggleCollapsed={() => setPathListCollapsed((c) => !c)}
             maxHeight={pathListHeight}

@@ -8,7 +8,7 @@ interface PathListProps {
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
-  onToggleWalk: (pathId: number) => void;
+
   collapsed: boolean;
   onToggleCollapsed: () => void;
   maxHeight: number | string;
@@ -20,7 +20,6 @@ export default function PathList({
   showWalkedOnly,
   hoveredPathId,
   onPathHover,
-  onToggleWalk,
   collapsed,
   onToggleCollapsed,
   maxHeight,
@@ -91,23 +90,6 @@ export default function PathList({
                       {path.properties.category}
                     </span>
                   </div>
-                  {isFavorite && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleWalk(path.id);
-                      }}
-                      className={`ml-2 flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
-                        isWalked
-                          ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800"
-                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                      }`}
-                      title={isWalked ? "Mark as not walked" : "Mark as walked"}
-                    >
-                      {isWalked ? "Walked" : "Walk"}
-                    </button>
-                  )}
                 </li>
               );
             })}
