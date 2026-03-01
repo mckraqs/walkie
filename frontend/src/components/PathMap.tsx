@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -69,6 +69,12 @@ const WALKED_STYLE: PathOptions = {
   color: "#059669",
   weight: 4,
   opacity: 0.9,
+};
+
+const WALKED_HOVER_STYLE: PathOptions = {
+  color: "#047857",
+  weight: 6,
+  opacity: 1,
 };
 
 const WALKED_HIGHLIGHT_STYLE: PathOptions = {
@@ -400,8 +406,10 @@ export default function PathMap({
     return PATH_STYLE;
   }
 
-  function getHoverStyle(): PathOptions {
+  function getHoverStyle(pathId: number): PathOptions {
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
+    const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
+    if (walked) return WALKED_HOVER_STYLE;
     return HOVER_STYLE;
   }
 
@@ -441,9 +449,10 @@ export default function PathMap({
     const layer = layerMapRef.current.get(hoveredPathId);
     if (!layer) return;
 
-    layer.setStyle(HOVER_STYLE);
+    const hoverStyle = getHoverStyle(hoveredPathId);
+    layer.setStyle(hoverStyle);
     layer.bringToFront();
-    setSiblingsStyle(hoveredPathId, HOVER_STYLE);
+    setSiblingsStyle(hoveredPathId, hoverStyle);
 
     // Show tooltip at path center (favorite only, from list hover)
     if (isFavorite && hoveredPathIdRef.current !== hoveredPathId && mapRef.current) {
@@ -465,6 +474,15 @@ export default function PathMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredPathId, isFavorite, pathFeatureMap]);
+
+  const pathStyleFn = useCallback(
+    (feature: GeoJSON.Feature | undefined) => {
+      if (!feature) return PATH_STYLE;
+      const pathId = (feature as PathFeature).id;
+      return getBaseStyle(pathId);
+    },
+    [],
+  );
 
   return (
     <div className={`relative h-full w-full${isCreatingPlace ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
@@ -489,10 +507,7 @@ export default function PathMap({
           <GeoJSON
             key={`paths-${hasRoute ? "dimmed" : "normal"}`}
             data={paths}
-            style={(feature) => {
-              const pathId = (feature as PathFeature).id;
-              return getBaseStyle(pathId);
-            }}
+            style={pathStyleFn}
             onEachFeature={(feature, layer: Layer) => {
               const pathFeature = feature as PathFeature;
               const pathId = pathFeature.id;
@@ -504,8 +519,8 @@ export default function PathMap({
                 mouseover: (e) => {
                   clearTimeout(hideTimerRef.current);
                   hoveredPathIdRef.current = pathId;
-                  (e.target as L.Path).setStyle(getHoverStyle());
-                  setSiblingsStyle(pathId, getHoverStyle());
+                  (e.target as L.Path).setStyle(getHoverStyle(pathId));
+                  setSiblingsStyle(pathId, getHoverStyle(pathId));
                   onPathHoverRef.current?.(pathId);
                   const containerPoint = (
                     e as L.LeafletMouseEvent
