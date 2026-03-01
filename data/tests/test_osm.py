@@ -9,7 +9,10 @@ import pytest
 from shapely.geometry import MultiLineString
 
 from data.providers.osm import (
+    WALKING_HIGHWAY_TYPES,
+    WILDLIFE_HIGHWAY_TYPES,
     RegionInfo,
+    RegionType,
     _assemble_boundary,
     _build_parent_admin_query,
     _build_relation_query,
@@ -52,6 +55,19 @@ class TestBuildWaysQuery:
         """Query requests full geometry output."""
         query = _build_ways_query(1)
         assert "out geom;" in query
+
+    def test_default_uses_walking_types(self) -> None:
+        """Default query uses WALKING_HIGHWAY_TYPES."""
+        query = _build_ways_query(1)
+        for ht in WALKING_HIGHWAY_TYPES:
+            assert ht in query
+
+    def test_wildlife_types_in_query(self) -> None:
+        """Wildlife highway types appear in query when passed."""
+        query = _build_ways_query(1, highway_types=WILDLIFE_HIGHWAY_TYPES)
+        for ht in WILDLIFE_HIGHWAY_TYPES:
+            assert ht in query
+        assert "residential" not in query
 
 
 class TestBuildRelationQuery:
@@ -113,6 +129,53 @@ class TestShouldExcludeWay:
     def test_allows_empty_tags_with_name(self) -> None:
         """Ways with only a name tag pass the filter."""
         assert _should_exclude_way({"name": "Some Road"}) is False
+
+    def test_wildlife_allows_unnamed(self) -> None:
+        """Wildlife mode does not exclude unnamed ways."""
+        assert (
+            _should_exclude_way(
+                {"highway": "path"}, region_type=RegionType.WILDLIFE
+            )
+            is False
+        )
+
+    def test_wildlife_excludes_foot_no(self) -> None:
+        """Wildlife mode still excludes ways with foot=no."""
+        assert (
+            _should_exclude_way(
+                {"highway": "track", "foot": "no"}, region_type=RegionType.WILDLIFE
+            )
+            is True
+        )
+
+    def test_wildlife_excludes_access_private(self) -> None:
+        """Wildlife mode still excludes ways with access=private."""
+        assert (
+            _should_exclude_way(
+                {"highway": "path", "access": "private"},
+                region_type=RegionType.WILDLIFE,
+            )
+            is True
+        )
+
+    def test_wildlife_excludes_area_yes(self) -> None:
+        """Wildlife mode still excludes ways with area=yes."""
+        assert (
+            _should_exclude_way(
+                {"highway": "footway", "area": "yes"},
+                region_type=RegionType.WILDLIFE,
+            )
+            is True
+        )
+
+    def test_city_still_excludes_unnamed(self) -> None:
+        """Explicit CITY region type excludes unnamed ways."""
+        assert (
+            _should_exclude_way(
+                {"highway": "residential"}, region_type=RegionType.CITY
+            )
+            is True
+        )
 
 
 class TestParseWayGeometry:
@@ -268,6 +331,22 @@ class TestBuildStreetsGdf:
         assert len(gdf) == 0
         assert gdf.crs is not None
         assert gdf.crs.to_epsg() == 4326
+
+    def test_wildlife_includes_unnamed(self) -> None:
+        """Wildlife mode includes unnamed ways with correct category."""
+        way = self._make_way(tags={"highway": "track", "surface": "dirt"})
+        gdf = _build_streets_gdf([way], "osm_1", region_type=RegionType.WILDLIFE)
+        assert len(gdf) == 1
+        row = gdf.iloc[0]
+        assert row["name"] == ""
+        assert row["category"] == "track"
+        assert row["surface"] == "unpaved"
+
+    def test_wildlife_filters_foot_no(self) -> None:
+        """Wildlife mode still excludes ways with foot=no."""
+        way = self._make_way(tags={"highway": "path", "foot": "no"})
+        gdf = _build_streets_gdf([way], "osm_1", region_type=RegionType.WILDLIFE)
+        assert len(gdf) == 0
 
 
 class TestAssembleBoundary:
@@ -537,3 +616,64 @@ class TestDownloadAndTransform:
         assert rows[0]["name"] == "TestTown"
         assert rows[0]["administrative_district_lvl_1"] == "Mazowieckie"
         assert rows[0]["administrative_district_lvl_2"] == "Powiat X"
+
+    @patch("data.providers.osm._overpass_post")
+    def test_wildlife_mode(
+        self,
+        mock_post: MagicMock,
+        tmp_path: FilePath,
+    ) -> None:
+        """Wildlife mode includes unnamed tracks and named paths."""
+        from data.providers.osm import RegionType, download_and_transform
+
+        wildlife_ways_response = {
+            "elements": [
+                {
+                    "type": "way",
+                    "id": 200,
+                    "tags": {"highway": "track", "surface": "dirt"},
+                    "geometry": [
+                        {"lat": 51.0, "lon": 20.0},
+                        {"lat": 51.1, "lon": 20.1},
+                    ],
+                },
+                {
+                    "type": "way",
+                    "id": 201,
+                    "tags": {
+                        "highway": "path",
+                        "name": "Forest Trail",
+                        "surface": "ground",
+                    },
+                    "geometry": [
+                        {"lat": 51.2, "lon": 20.2},
+                        {"lat": 51.3, "lon": 20.3},
+                    ],
+                },
+            ],
+        }
+
+        mock_post.side_effect = [
+            wildlife_ways_response,
+            self._mock_overpass_relation_response(),
+            self._mock_overpass_admin_response("Mazowieckie", "4"),
+            self._mock_overpass_admin_response("Powiat X", "6"),
+        ]
+
+        streets_path = tmp_path / "streets.gpkg"
+        regions_path = tmp_path / "regions.csv"
+
+        download_and_transform(
+            relation_id=999,
+            streets_output_path=str(streets_path),
+            regions_output_path=str(regions_path),
+            region_type=RegionType.WILDLIFE,
+        )
+
+        gdf = gpd.read_file(streets_path)
+        assert len(gdf) == 2
+        categories = set(gdf["category"])
+        assert categories == {"track", "path"}
+        unnamed = gdf[gdf["name"] == ""]
+        assert len(unnamed) == 1
+        assert unnamed.iloc[0]["category"] == "track"

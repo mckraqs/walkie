@@ -13,6 +13,7 @@ Outputs:
 import csv
 import time
 from dataclasses import dataclass
+from enum import StrEnum
 
 import geopandas as gpd
 import requests
@@ -28,6 +29,14 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_TIMEOUT = 180
 OSM_AREA_OFFSET = 3_600_000_000
 
+
+class RegionType(StrEnum):
+    """Type of geographic region for OSM data downloads."""
+
+    CITY = "city"
+    WILDLIFE = "wildlife"
+
+
 WALKING_HIGHWAY_TYPES = (
     "residential",
     "living_street",
@@ -40,6 +49,20 @@ WALKING_HIGHWAY_TYPES = (
     "unclassified",
     "trunk_link",
 )
+
+WILDLIFE_HIGHWAY_TYPES = (
+    "path",
+    "track",
+    "footway",
+    "bridleway",
+    "cycleway",
+    "steps",
+)
+
+HIGHWAY_TYPES_BY_REGION: dict[RegionType, tuple[str, ...]] = {
+    RegionType.CITY: WALKING_HIGHWAY_TYPES,
+    RegionType.WILDLIFE: WILDLIFE_HIGHWAY_TYPES,
+}
 
 SURFACE_MAP: dict[str, str] = {
     "asphalt": "paved",
@@ -80,6 +103,12 @@ ARGUMENTS = [
         "name": "--regions_output_path",
         "help": "Path to the output regions CSV file.",
     },
+    {
+        "name": "--region_type",
+        "help": "Type of region: 'city' (default) or 'wildlife'.",
+        "default": "city",
+        "choices": ["city", "wildlife"],
+    },
 ]
 
 
@@ -94,17 +123,21 @@ class RegionInfo:
     administrative_district_lvl_2: str
 
 
-def _build_ways_query(relation_id: int) -> str:
+def _build_ways_query(
+    relation_id: int,
+    highway_types: tuple[str, ...] = WALKING_HIGHWAY_TYPES,
+) -> str:
     """Build an Overpass QL query for walking-relevant highway Ways.
 
     Args:
         relation_id: OSM relation ID.
+        highway_types: Highway type strings to include in the query.
 
     Returns:
         Overpass QL query string.
     """
     area_id = relation_id + OSM_AREA_OFFSET
-    highway_regex = "^(" + "|".join(WALKING_HIGHWAY_TYPES) + ")$"
+    highway_regex = "^(" + "|".join(highway_types) + ")$"
     return (
         f"[out:json][timeout:{OVERPASS_TIMEOUT}];"
         f"area(id:{area_id})->.searchArea;"
@@ -181,16 +214,20 @@ def _overpass_post(query: str, *, max_retries: int = 3) -> dict:
     raise AssertionError(msg)
 
 
-def _should_exclude_way(tags: dict[str, str]) -> bool:
+def _should_exclude_way(
+    tags: dict[str, str],
+    region_type: RegionType = RegionType.CITY,
+) -> bool:
     """Check whether a Way should be excluded based on its tags.
 
     Args:
         tags: OSM tags dict for the Way.
+        region_type: Region type; CITY requires a name, WILDLIFE does not.
 
     Returns:
         True if the Way should be filtered out.
     """
-    if not tags.get("name"):
+    if region_type == RegionType.CITY and not tags.get("name"):
         return True
     if tags.get("area") == "yes":
         return True
@@ -228,17 +265,24 @@ def _normalize_surface(raw: str) -> str:
     return SURFACE_MAP.get(raw, "")
 
 
-def _fetch_ways(relation_id: int) -> list[dict]:
+def _fetch_ways(
+    relation_id: int,
+    region_type: RegionType = RegionType.CITY,
+) -> list[dict]:
     """Fetch walking-relevant highway Ways from Overpass.
 
     Args:
         relation_id: OSM relation ID.
+        region_type: Region type to select highway types.
 
     Returns:
         List of Way element dicts from the Overpass response.
     """
-    query = _build_ways_query(relation_id)
-    logger.info("Fetching ways for relation %d", relation_id)
+    highway_types = HIGHWAY_TYPES_BY_REGION[region_type]
+    query = _build_ways_query(relation_id, highway_types=highway_types)
+    logger.info(
+        "Fetching ways for relation %d (region_type=%s)", relation_id, region_type
+    )
     data = _overpass_post(query)
     elements = [e for e in data.get("elements", []) if e.get("type") == "way"]
     logger.info("Received %d ways", len(elements))
@@ -248,6 +292,7 @@ def _fetch_ways(relation_id: int) -> list[dict]:
 def _build_streets_gdf(
     ways: list[dict],
     region_code: str,
+    region_type: RegionType = RegionType.CITY,
 ) -> gpd.GeoDataFrame:
     """Transform Overpass Way elements into a GeoDataFrame.
 
@@ -257,6 +302,7 @@ def _build_streets_gdf(
     Args:
         ways: List of Way element dicts from Overpass.
         region_code: Region code to assign to all rows.
+        region_type: Region type controlling filtering rules.
 
     Returns:
         GeoDataFrame with columns: name, geometry, category, surface,
@@ -268,7 +314,7 @@ def _build_streets_gdf(
     for way in ways:
         tags = way.get("tags", {})
 
-        if _should_exclude_way(tags):
+        if _should_exclude_way(tags, region_type=region_type):
             skipped += 1
             continue
 
@@ -474,6 +520,7 @@ def download_and_transform(
     relation_id: int,
     streets_output_path: str,
     regions_output_path: str,
+    region_type: RegionType = RegionType.CITY,
 ) -> None:
     """Download OSM data and produce streets GeoPackage + regions CSV.
 
@@ -484,11 +531,12 @@ def download_and_transform(
         relation_id: OSM relation ID for the target area.
         streets_output_path: Path to the output streets GeoPackage file.
         regions_output_path: Path to the output regions CSV file.
+        region_type: Region type controlling highway types and filtering.
     """
     region_code = f"osm_{relation_id}"
 
-    ways = _fetch_ways(relation_id)
-    gdf = _build_streets_gdf(ways, region_code)
+    ways = _fetch_ways(relation_id, region_type=region_type)
+    gdf = _build_streets_gdf(ways, region_code, region_type=region_type)
     logger.info("Streets GeoDataFrame: %d rows, CRS=%s", len(gdf), gdf.crs)
 
     region_info = _fetch_region_info(relation_id)
@@ -505,4 +553,5 @@ if __name__ == "__main__":
         relation_id=args["relation_id"],
         streets_output_path=args["streets_output_path"],
         regions_output_path=args["regions_output_path"],
+        region_type=RegionType(args["region_type"]),
     )
