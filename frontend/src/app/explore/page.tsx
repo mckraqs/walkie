@@ -11,9 +11,11 @@ import {
   removeFavoriteRegion,
   fetchWalkedPaths,
   fetchPlaces,
+  fetchSavedRoutes,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import RegionExplorer from "@/components/RegionExplorer";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type {
   RegionListItem,
   RegionFeature,
@@ -43,6 +45,7 @@ export default function ExplorePage() {
   const [showPlaces, setShowPlaces] = useState(false);
   const [isCreatingPlace, setIsCreatingPlace] = useState(false);
   const [pendingPlaceLocation, setPendingPlaceLocation] = useState<[number, number] | null>(null);
+  const [unfavoriteConfirm, setUnfavoriteConfirm] = useState<{ routeCount: number; placeCount: number } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -178,41 +181,83 @@ export default function ExplorePage() {
     setSelectedLvl1(value);
   }
 
-  async function toggleFavorite() {
+  function buildUnfavoriteMessage(routeCount: number, placeCount: number): string {
+    const parts: string[] = [];
+    if (routeCount > 0) parts.push(`${routeCount} saved route${routeCount === 1 ? "" : "s"}`);
+    if (placeCount > 0) parts.push(`${placeCount} saved place${placeCount === 1 ? "" : "s"}`);
+    return `This will permanently delete ${parts.join(" and ")} in this region. This action cannot be undone.`;
+  }
+
+  async function executeUnfavorite() {
     const id = Number(selectedRegionId);
-    const listItem = regions.find((r) => r.id === id);
-    if (!listItem) return;
-    const currentlyFavorite = listItem.is_favorite;
     try {
-      if (currentlyFavorite) {
-        await removeFavoriteRegion(id);
-      } else {
-        await addFavoriteRegion(id);
-      }
+      await removeFavoriteRegion(id);
       setRegions((prev) =>
         prev.map((r) =>
-          r.id === id ? { ...r, is_favorite: !r.is_favorite } : r,
+          r.id === id ? { ...r, is_favorite: false } : r,
         ),
       );
       if (region && region.id === id) {
         setRegion({
           ...region,
-          properties: { ...region.properties, is_favorite: !currentlyFavorite },
+          properties: { ...region.properties, is_favorite: false },
         });
-      }
-      if (!currentlyFavorite) {
-        fetchWalkedPaths(selectedRegionId)
-          .then((data) => {
-            setWalkedPathIds(data.walked_path_ids);
-            setTotalPaths(data.total_paths);
-          })
-          .catch(() => {
-            setWalkedPathIds([]);
-            setTotalPaths(0);
-          });
       }
     } catch {
       // Silently handle
+    }
+    setUnfavoriteConfirm(null);
+  }
+
+  async function executeFavorite() {
+    const id = Number(selectedRegionId);
+    try {
+      await addFavoriteRegion(id);
+      setRegions((prev) =>
+        prev.map((r) =>
+          r.id === id ? { ...r, is_favorite: true } : r,
+        ),
+      );
+      if (region && region.id === id) {
+        setRegion({
+          ...region,
+          properties: { ...region.properties, is_favorite: true },
+        });
+      }
+      fetchWalkedPaths(selectedRegionId)
+        .then((data) => {
+          setWalkedPathIds(data.walked_path_ids);
+          setTotalPaths(data.total_paths);
+        })
+        .catch(() => {
+          setWalkedPathIds([]);
+          setTotalPaths(0);
+        });
+    } catch {
+      // Silently handle
+    }
+  }
+
+  async function toggleFavorite() {
+    const id = Number(selectedRegionId);
+    const listItem = regions.find((r) => r.id === id);
+    if (!listItem) return;
+
+    if (listItem.is_favorite) {
+      try {
+        const routes = await fetchSavedRoutes(selectedRegionId);
+        const routeCount = routes.length;
+        const placeCount = places.length;
+        if (routeCount > 0 || placeCount > 0) {
+          setUnfavoriteConfirm({ routeCount, placeCount });
+          return;
+        }
+      } catch {
+        // If fetch fails, proceed without confirmation
+      }
+      await executeUnfavorite();
+    } else {
+      await executeFavorite();
     }
   }
 
@@ -392,6 +437,16 @@ export default function ExplorePage() {
           />
         )}
       </div>
+      {unfavoriteConfirm && (
+        <ConfirmDialog
+          title="Remove from favorites?"
+          message={buildUnfavoriteMessage(unfavoriteConfirm.routeCount, unfavoriteConfirm.placeCount)}
+          confirmLabel="Remove"
+          cancelLabel="Keep"
+          onConfirm={executeUnfavorite}
+          onCancel={() => setUnfavoriteConfirm(null)}
+        />
+      )}
     </div>
   );
 }

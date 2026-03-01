@@ -3,6 +3,7 @@
 from typing import ClassVar
 
 from django.contrib.gis.db.models.functions import Length
+from django.db import transaction
 from django.db.models import Case, F, FloatField, QuerySet, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
@@ -15,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from paths.models import Path, PathSegment
+from places.models import Place
 from regions.models import Region
 from regions.serializers import RegionListItemSerializer
 from routes.models import Route
@@ -137,22 +139,38 @@ class FavoriteRegionToggleView(APIView):
         )
 
     def delete(self, request: Request, pk: int) -> Response:
-        """Remove a region from favorites.
+        """Remove a region from favorites and delete associated user data.
+
+        Deletes all routes and places the user created in the region,
+        then removes the favorite. All deletions run in a single transaction.
 
         Args:
             request: The authenticated HTTP request.
             pk: The region primary key.
 
         Returns:
-            204 if removed, 404 if not in favorites.
+            200 with deletion counts, or 404 if not in favorites.
         """
         region = get_object_or_404(Region, pk=pk)
-        deleted, _ = FavoriteRegion.objects.filter(
+        favorite = FavoriteRegion.objects.filter(
             user=request.user, region=region
-        ).delete()
-        if not deleted:
+        ).first()
+        if not favorite:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        with transaction.atomic():
+            routes_deleted, _ = Route.objects.filter(
+                user=request.user, region=region
+            ).delete()
+            places_deleted, _ = Place.objects.filter(
+                user=request.user, region=region
+            ).delete()
+            favorite.delete()
+
+        return Response(
+            {"routes_deleted": routes_deleted, "places_deleted": places_deleted},
+            status=status.HTTP_200_OK,
+        )
 
 
 def _get_walked_path_ids(user: object, region: Region) -> list[int]:

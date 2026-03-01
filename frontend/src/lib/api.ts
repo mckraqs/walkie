@@ -16,6 +16,7 @@ import type {
   SaveRouteRequest,
   RouteRenameRequest,
   RouteWalkToggleResponse,
+  RemoveFavoriteResponse,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -174,7 +175,7 @@ export async function addFavoriteRegion(regionId: number): Promise<void> {
   }
 }
 
-export async function removeFavoriteRegion(regionId: number): Promise<void> {
+export async function removeFavoriteRegion(regionId: number): Promise<RemoveFavoriteResponse> {
   const res = await fetch(`${API_URL}/api/regions/${regionId}/favorite/`, {
     method: "DELETE",
     headers: authHeaders(),
@@ -183,6 +184,7 @@ export async function removeFavoriteRegion(regionId: number): Promise<void> {
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to remove favorite: ${res.status}`);
   }
+  return res.json();
 }
 
 export async function fetchWalkedPaths(regionId: string): Promise<WalkedPathsResponse> {

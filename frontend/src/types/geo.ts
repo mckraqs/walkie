@@ -159,3 +159,8 @@ export interface SaveRouteRequest {
 export interface RouteRenameRequest {
   name: string;
 }
+
+export interface RemoveFavoriteResponse {
+  routes_deleted: number;
+  places_deleted: number;
+}

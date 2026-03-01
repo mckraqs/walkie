@@ -7,7 +7,9 @@ from django.db import IntegrityError
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
+from places.models import Place
 from regions.models import Region
+from routes.models import Route
 from users.models import FavoriteRegion
 
 SAMPLE_POLYGON_WKT = (
@@ -246,16 +248,97 @@ class TestFavoriteRegionToggleView:
 
         assert response.status_code == 404
 
-    def test_remove_favorite_returns_204(
+    def test_remove_favorite_returns_200(
         self, auth_client: APIClient, user: User, region: Region
     ) -> None:
-        """DELETE returns 204 when region is removed from favorites."""
+        """DELETE returns 200 with deletion counts when region is removed."""
         FavoriteRegion.objects.create(user=user, region=region)
 
         response = auth_client.delete(f"/api/regions/{region.pk}/favorite/")
 
-        assert response.status_code == 204
+        assert response.status_code == 200
+        data = response.json()
+        assert "routes_deleted" in data
+        assert "places_deleted" in data
         assert not FavoriteRegion.objects.filter(user=user, region=region).exists()
+
+    def test_remove_favorite_deletes_routes_and_places(
+        self, auth_client: APIClient, user: User, region: Region
+    ) -> None:
+        """DELETE cascade-deletes routes and places for the user+region."""
+        FavoriteRegion.objects.create(user=user, region=region)
+        Route.objects.create(
+            user=user,
+            region=region,
+            name="Route 1",
+            segment_ids=[1, 2],
+            total_distance=1.5,
+        )
+        Route.objects.create(
+            user=user,
+            region=region,
+            name="Route 2",
+            segment_ids=[3, 4],
+            total_distance=2.0,
+        )
+        Place.objects.create(
+            user=user,
+            region=region,
+            name="Place 1",
+            location=GEOSGeometry("POINT(20.5 50.5)", srid=4326),
+        )
+
+        response = auth_client.delete(f"/api/regions/{region.pk}/favorite/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["routes_deleted"] == 2
+        assert data["places_deleted"] == 1
+        assert not Route.objects.filter(user=user, region=region).exists()
+        assert not Place.objects.filter(user=user, region=region).exists()
+        assert not FavoriteRegion.objects.filter(user=user, region=region).exists()
+
+    def test_remove_favorite_does_not_affect_other_users_data(
+        self, auth_client: APIClient, user: User, region: Region
+    ) -> None:
+        """DELETE only removes the requesting user's data, not others'."""
+        other_user = User.objects.create_user(
+            username="otheruser", password="otherpass123"
+        )
+        FavoriteRegion.objects.create(user=user, region=region)
+        FavoriteRegion.objects.create(user=other_user, region=region)
+        Route.objects.create(
+            user=other_user,
+            region=region,
+            name="Other Route",
+            segment_ids=[5],
+            total_distance=1.0,
+        )
+        Place.objects.create(
+            user=other_user,
+            region=region,
+            name="Other Place",
+            location=GEOSGeometry("POINT(20.5 50.5)", srid=4326),
+        )
+
+        auth_client.delete(f"/api/regions/{region.pk}/favorite/")
+
+        assert Route.objects.filter(user=other_user, region=region).count() == 1
+        assert Place.objects.filter(user=other_user, region=region).count() == 1
+        assert FavoriteRegion.objects.filter(user=other_user, region=region).exists()
+
+    def test_remove_favorite_returns_zero_counts_when_no_data(
+        self, auth_client: APIClient, user: User, region: Region
+    ) -> None:
+        """DELETE returns zero counts when user has no routes/places."""
+        FavoriteRegion.objects.create(user=user, region=region)
+
+        response = auth_client.delete(f"/api/regions/{region.pk}/favorite/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["routes_deleted"] == 0
+        assert data["places_deleted"] == 0
 
     def test_remove_nonexistent_favorite_returns_404(
         self, auth_client: APIClient, region: Region
