@@ -28,6 +28,13 @@ export default function PathList({
     ? paths.filter((p) => walkedPathIds.has(p.id))
     : paths;
 
+  const deduplicatedPaths = visiblePaths.filter((path, index, arr) => {
+    if (!path.properties.name) return true;
+    return (
+      arr.findIndex((p) => p.properties.name === path.properties.name) === index
+    );
+  });
+
   return (
     <div
       className="flex flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg transition-all duration-300 ease-in-out dark:border-zinc-700 dark:bg-zinc-900"
@@ -55,13 +62,13 @@ export default function PathList({
         </svg>
       </button>
       <div className="flex-1 overflow-y-auto p-4">
-        {visiblePaths.length === 0 ? (
+        {deduplicatedPaths.length === 0 ? (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             No paths to display.
           </p>
         ) : (
           <ul className="space-y-1">
-            {visiblePaths.map((path) => {
+            {deduplicatedPaths.map((path) => {
               const isWalked = walkedPathIds.has(path.id);
               const isHovered = hoveredPathId === path.id;
 
