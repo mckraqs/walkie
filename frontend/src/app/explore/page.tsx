@@ -353,7 +353,7 @@ export default function ExplorePage() {
               </button>
               <span className="text-sm text-zinc-500 dark:text-zinc-400">
                 {walkedCount}/{totalPaths}{" "}
-                ({totalPaths > 0 ? Math.round((walkedCount / totalPaths) * 100) : 0}%)
+                ({totalPaths > 0 ? ((walkedCount / totalPaths) * 100).toFixed(1) : "0.0"}%)
               </span>
               <button
                 type="button"
