@@ -1726,3 +1726,101 @@ class TestStitchSegmentCoordinatesFromIds:
     def test_empty_list(self) -> None:
         """Empty segment_ids returns an empty list."""
         assert stitch_segment_coordinates_from_ids([]) == []
+
+
+@pytest.mark.django_db
+class TestShortestPathFallback:
+    """Tests for the shortest-path fallback in _generate_one_way_route."""
+
+    def test_used_shortest_path_defaults_to_false(
+        self, region_with_topology: Region
+    ) -> None:
+        """Normal route generation (no overrides) has used_shortest_path=False."""
+        result = generate_route(region_with_topology.pk, 200.0)
+
+        assert result.used_shortest_path is False
+
+    def test_falls_back_to_shortest_path_when_distance_too_short(
+        self, region_with_topology: Region
+    ) -> None:
+        """When target_distance < shortest path distance, fallback triggers."""
+        segments = list(
+            Segment.objects.filter(region=region_with_topology).order_by("pk")
+        )
+        start_node = segments[0].source
+        end_node = segments[-1].target
+
+        result = generate_route(
+            region_with_topology.pk,
+            10.0,
+            RouteType.ONE_WAY,
+            start_node_override=start_node,
+            end_node_override=end_node,
+        )
+
+        assert result.used_shortest_path is True
+        assert len(result.segment_ids) > 0
+        assert result.start_point is not None
+        assert result.end_point is not None
+
+    def test_no_fallback_when_distance_sufficient(
+        self, region_with_topology: Region
+    ) -> None:
+        """When target_distance >= shortest path distance, normal generation runs."""
+        segments = list(
+            Segment.objects.filter(region=region_with_topology).order_by("pk")
+        )
+        start_node = segments[0].source
+        end_node = segments[-1].target
+
+        result = generate_route(
+            region_with_topology.pk,
+            50_000.0,
+            RouteType.ONE_WAY,
+            start_node_override=start_node,
+            end_node_override=end_node,
+        )
+
+        assert result.used_shortest_path is False
+
+    def test_no_fallback_when_only_start_override(
+        self, region_with_topology: Region
+    ) -> None:
+        """Fallback only fires when BOTH overrides are set; start-only is unaffected."""
+        segments = list(
+            Segment.objects.filter(region=region_with_topology).order_by("pk")
+        )
+        start_node = segments[0].source
+
+        result = generate_route(
+            region_with_topology.pk,
+            200.0,
+            RouteType.ONE_WAY,
+            start_node_override=start_node,
+        )
+
+        assert result.used_shortest_path is False
+
+
+@pytest.mark.django_db
+class TestRouteGenerateViewUsedShortestPath:
+    """Test that the generate endpoint propagates used_shortest_path."""
+
+    def test_api_response_includes_used_shortest_path(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """API response always includes the used_shortest_path boolean field."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/generate/",
+            {"target_distance_km": 0.2},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "used_shortest_path" in data
+        assert isinstance(data["used_shortest_path"], bool)

@@ -151,6 +151,7 @@ class RouteGenerateView(APIView):
                 "segments": segments_data,
                 "paths_count": len(path_names),
                 "path_names": path_names,
+                "used_shortest_path": result.used_shortest_path,
             }
         )
 

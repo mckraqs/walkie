@@ -50,6 +50,7 @@ class RouteResult:
     start_point: tuple[float, float] | None = None  # (lon, lat)
     end_point: tuple[float, float] | None = None  # (lon, lat)
     is_loop: bool = False
+    used_shortest_path: bool = False
 
 
 def _find_random_node_near_place(
@@ -521,6 +522,27 @@ def _generate_one_way_route(
         if end_node_override is not None
         else _find_best_target_node(region_id, source_node, target_distance_m)
     )
+
+    if start_node_override is not None and end_node_override is not None:
+        shortest_result = _compute_shortest_path(
+            region_id,
+            source_node,
+            target_node,
+            edges_sql=_build_edges_sql(region_id),
+        )
+        shortest_distance = compute_segment_distance(shortest_result.segment_ids)
+        if target_distance_m < shortest_distance:
+            start_point = _get_node_coordinates(source_node)
+            end_point = _get_node_coordinates(target_node)
+            return RouteResult(
+                segment_ids=shortest_result.segment_ids,
+                total_distance=shortest_distance,
+                start_node=source_node,
+                end_node=target_node,
+                start_point=start_point,
+                end_point=end_point,
+                used_shortest_path=True,
+            )
 
     wp_count = _compute_waypoint_count(target_distance_m)
     waypoints = _pick_intermediate_waypoints(

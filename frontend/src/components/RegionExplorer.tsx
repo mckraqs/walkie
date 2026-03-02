@@ -20,6 +20,7 @@ import {
 import SidePanel from "@/components/SidePanel";
 import PlaceNameDialog from "@/components/PlaceNameDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/contexts/ToastContext";
 import type {
   RegionFeature,
   PathFeatureCollection,
@@ -83,6 +84,7 @@ export default function RegionExplorer({
   onToggleCreatingPlace,
   onDeletePlace,
 }: RegionExplorerProps) {
+  const { showToast } = useToast();
   const [route, setRoute] = useState<RouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +174,11 @@ export default function RegionExplorer({
         });
         setRoute(result);
         setActiveRouteId(null);
+        if (result.used_shortest_path) {
+          showToast(
+            "The shortest path was used because the requested distance is shorter than the minimum route between selected points.",
+          );
+        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to generate route",
@@ -181,7 +188,7 @@ export default function RegionExplorer({
         setLoading(false);
       }
     },
-    [regionId],
+    [regionId, showToast],
   );
 
   const handleClear = useCallback(() => {

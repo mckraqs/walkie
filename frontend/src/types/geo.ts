@@ -106,6 +106,7 @@ export interface RouteResponse {
   segments: PathFeatureCollection;
   paths_count: number;
   path_names: string[];
+  used_shortest_path?: boolean;
 }
 
 export interface WalkedPathsResponse {
