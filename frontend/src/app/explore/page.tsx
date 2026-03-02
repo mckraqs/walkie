@@ -135,15 +135,11 @@ export default function ExplorePage() {
     setPendingPlaceLocation(location);
   }, []);
 
-  const handlePlaceCreated = useCallback(() => {
+  const handlePlaceCreated = useCallback((place: Place) => {
     setPendingPlaceLocation(null);
     setIsCreatingPlace(false);
-    if (selectedRegionId) {
-      fetchPlaces(selectedRegionId)
-        .then(setPlaces)
-        .catch(() => setPlaces([]));
-    }
-  }, [selectedRegionId]);
+    setPlaces((prev) => [...prev, place]);
+  }, []);
 
   const handlePlaceDeleted = useCallback(() => {
     if (selectedRegionId) {
@@ -156,6 +152,12 @@ export default function ExplorePage() {
   const handleCancelPlaceCreation = useCallback(() => {
     setPendingPlaceLocation(null);
   }, []);
+
+  const handleExitPlaceCreation = useCallback(() => {
+    setIsCreatingPlace(false);
+    setPendingPlaceLocation(null);
+  }, []);
+
 
   const districts = useMemo(
     () =>
@@ -441,6 +443,7 @@ export default function ExplorePage() {
             onPlaceCreated={handlePlaceCreated}
             onPlaceDeleted={handlePlaceDeleted}
             onCancelPlaceCreation={handleCancelPlaceCreation}
+            onExitPlaceCreation={handleExitPlaceCreation}
           />
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { downloadRouteFile } from "@/lib/gpx";
+import type { TempPoint } from "@/components/RegionExplorer";
 import type {
   RouteResponse,
   RouteType,
@@ -13,7 +14,7 @@ interface RoutePlannerProps {
   route: RouteResponse | null;
   loading: boolean;
   error: string | null;
-  onGenerate: (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null) => void;
+  onGenerate: (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null, startCoords?: [number, number] | null, endCoords?: [number, number] | null) => void;
   onClear: () => void;
   isFavorite: boolean;
   places?: Place[];
@@ -22,6 +23,11 @@ interface RoutePlannerProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
+  startTempPoint: TempPoint | null;
+  endTempPoint: TempPoint | null;
+  onPickPointOnMap: (which: "start" | "end") => void;
+  onClearTempPoint: (which: "start" | "end") => void;
+  autoSelectPlace: { which: "start" | "end"; placeId: number } | null;
 }
 
 function formatDistance(meters: number): string {
@@ -44,6 +50,11 @@ export default function RoutePlanner({
   collapsed,
   onToggleCollapsed,
   height,
+  startTempPoint,
+  endTempPoint,
+  onPickPointOnMap,
+  onClearTempPoint,
+  autoSelectPlace,
 }: RoutePlannerProps) {
   const [distance, setDistance] = useState("3");
   const [routeType, setRouteType] = useState<RouteType>("one_way");
@@ -59,11 +70,27 @@ export default function RoutePlanner({
     setSaveError(null);
   }, [route]);
 
+  useEffect(() => {
+    if (!autoSelectPlace) return;
+    if (autoSelectPlace.which === "start") {
+      setStartPlaceId(autoSelectPlace.placeId);
+    } else {
+      setEndPlaceId(autoSelectPlace.placeId);
+    }
+  }, [autoSelectPlace]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const km = parseFloat(distance);
     if (!isNaN(km) && km >= 0.1 && km <= 50) {
-      onGenerate(km, routeType, startPlaceId, endPlaceId);
+      onGenerate(
+        km,
+        routeType,
+        startTempPoint ? null : startPlaceId,
+        endTempPoint ? null : endPlaceId,
+        startTempPoint?.coords ?? null,
+        endTempPoint?.coords ?? null,
+      );
     }
   }
 
@@ -144,56 +171,124 @@ export default function RoutePlanner({
               Loop route
             </span>
           </label>
-          {places && places.length > 0 && (
-            <div className="space-y-2">
-              <div>
-                <label
-                  htmlFor="start-place"
-                  className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
-                >
-                  {routeType === "loop" ? "Start / Finish place" : "Start place"}
-                </label>
+          <div className="space-y-2">
+            <div>
+              <label
+                htmlFor="start-place"
+                className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+              >
+                {routeType === "loop" ? "Start / Finish place" : "Start place"}
+              </label>
+              <div className="flex items-center gap-1">
                 <select
                   id="start-place"
-                  value={startPlaceId ?? ""}
-                  onChange={(e) => setStartPlaceId(e.target.value ? Number(e.target.value) : null)}
+                  value={startTempPoint ? "__custom__" : (startPlaceId ?? "")}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__custom__") return;
+                    onClearTempPoint("start");
+                    setStartPlaceId(val ? Number(val) : null);
+                  }}
                   disabled={loading}
-                  className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                  className="min-w-0 flex-1 rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
                 >
                   <option value="">Random (default)</option>
-                  {places.map((p) => (
+                  {startTempPoint && (
+                    <option value="__custom__">Custom point</option>
+                  )}
+                  {places?.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
                   ))}
                 </select>
-              </div>
-              {routeType === "one_way" && (
-                <div>
-                  <label
-                    htmlFor="end-place"
-                    className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+                {startTempPoint ? (
+                  <button
+                    type="button"
+                    onClick={() => onClearTempPoint("start")}
+                    disabled={loading}
+                    className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded border border-zinc-300 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    title="Clear custom point"
                   >
-                    Finish place
-                  </label>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onPickPointOnMap("start")}
+                    disabled={loading}
+                    className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded border border-zinc-300 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    title="Pick on map"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                      <path fillRule="evenodd" d="m9.69 18.933.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 0 0 .281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 1 0 3 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 0 0 2.273 1.765 11.842 11.842 0 0 0 .976.544l.062.029.018.008.006.003ZM10 11.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+            {routeType === "one_way" && (
+              <div>
+                <label
+                  htmlFor="end-place"
+                  className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400"
+                >
+                  Finish place
+                </label>
+                <div className="flex items-center gap-1">
                   <select
                     id="end-place"
-                    value={endPlaceId ?? ""}
-                    onChange={(e) => setEndPlaceId(e.target.value ? Number(e.target.value) : null)}
+                    value={endTempPoint ? "__custom__" : (endPlaceId ?? "")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__custom__") return;
+                      onClearTempPoint("end");
+                      setEndPlaceId(val ? Number(val) : null);
+                    }}
                     disabled={loading}
-                    className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                    className="min-w-0 flex-1 rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
                   >
                     <option value="">Random (default)</option>
-                    {places.map((p) => (
+                    {endTempPoint && (
+                      <option value="__custom__">Custom point</option>
+                    )}
+                    {places?.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
                     ))}
                   </select>
+                  {endTempPoint ? (
+                    <button
+                      type="button"
+                      onClick={() => onClearTempPoint("end")}
+                      disabled={loading}
+                      className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded border border-zinc-300 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      title="Clear custom point"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                        <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onPickPointOnMap("end")}
+                      disabled={loading}
+                      className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded border border-zinc-300 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      title="Pick on map"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                        <path fillRule="evenodd" d="m9.69 18.933.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 0 0 .281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 1 0 3 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 0 0 2.273 1.765 11.842 11.842 0 0 0 .976.544l.062.029.018.008.006.003ZM10 11.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </form>
 
         {error && (

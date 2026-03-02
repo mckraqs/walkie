@@ -20,6 +20,34 @@ class RouteGenerateRequestSerializer(serializers.Serializer):
     end_place_id = serializers.IntegerField(
         required=False, default=None, allow_null=True
     )
+    start_coords = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=2,
+        max_length=2,
+        required=False,
+        default=None,
+        allow_null=True,
+    )
+    end_coords = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=2,
+        max_length=2,
+        required=False,
+        default=None,
+        allow_null=True,
+    )
+
+    def validate(self, attrs: dict) -> dict:
+        """Ensure place ID and raw coords are mutually exclusive."""
+        if attrs.get("start_place_id") and attrs.get("start_coords"):
+            raise serializers.ValidationError(
+                "Provide either start_place_id or start_coords, not both."
+            )
+        if attrs.get("end_place_id") and attrs.get("end_coords"):
+            raise serializers.ValidationError(
+                "Provide either end_place_id or end_coords, not both."
+            )
+        return attrs
 
 
 class RouteSegmentSerializer(GeoFeatureModelSerializer):

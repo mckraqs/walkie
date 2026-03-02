@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import SidePanel from "@/components/SidePanel";
 import PlaceNameDialog from "@/components/PlaceNameDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type {
   RegionFeature,
   PathFeatureCollection,
@@ -25,6 +26,10 @@ import type {
   SegmentFeatureCollection,
   SegmentFeature,
 } from "@/types/geo";
+
+export interface TempPoint {
+  coords: [number, number];
+}
 
 const PathMap = dynamic(() => import("@/components/PathMap"), { ssr: false });
 
@@ -115,9 +120,10 @@ interface RegionExplorerProps {
   isCreatingPlace: boolean;
   pendingPlaceLocation: [number, number] | null;
   onPlaceCreate: (location: [number, number]) => void;
-  onPlaceCreated: () => void;
+  onPlaceCreated: (place: Place) => void;
   onPlaceDeleted: () => void;
   onCancelPlaceCreation: () => void;
+  onExitPlaceCreation: () => void;
 }
 
 export default function RegionExplorer({
@@ -136,6 +142,7 @@ export default function RegionExplorer({
   onPlaceCreated,
   onPlaceDeleted,
   onCancelPlaceCreation,
+  onExitPlaceCreation,
 }: RegionExplorerProps) {
   const [route, setRoute] = useState<RouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -147,6 +154,14 @@ export default function RegionExplorer({
   const [segments, setSegments] = useState<SegmentFeatureCollection | null>(null);
   const [selectedSegmentIds, setSelectedSegmentIds] = useState<number[]>([]);
   const [composerError, setComposerError] = useState<string | null>(null);
+
+  // Point picking state
+  const [pickingPoint, setPickingPoint] = useState<"start" | "end" | null>(null);
+  const [startTempPoint, setStartTempPoint] = useState<TempPoint | null>(null);
+  const [endTempPoint, setEndTempPoint] = useState<TempPoint | null>(null);
+  const [pendingSavePointLocation, setPendingSavePointLocation] = useState<[number, number] | null>(null);
+  const [pendingSavePointTarget, setPendingSavePointTarget] = useState<"start" | "end" | null>(null);
+  const [autoSelectPlace, setAutoSelectPlace] = useState<{ which: "start" | "end"; placeId: number } | null>(null);
 
   useEffect(() => {
     if (!isFavorite) return;
@@ -197,7 +212,14 @@ export default function RegionExplorer({
   );
 
   const handleGenerate = useCallback(
-    async (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null) => {
+    async (
+      distanceKm: number,
+      routeType: RouteType,
+      startPlaceId: number | null,
+      endPlaceId: number | null,
+      startCoords?: [number, number] | null,
+      endCoords?: [number, number] | null,
+    ) => {
       setLoading(true);
       setError(null);
       try {
@@ -206,6 +228,8 @@ export default function RegionExplorer({
           route_type: routeType,
           start_place_id: startPlaceId,
           end_place_id: endPlaceId,
+          start_coords: startCoords ?? null,
+          end_coords: endCoords ?? null,
         });
         setRoute(result);
         setActiveRouteId(null);
@@ -225,6 +249,8 @@ export default function RegionExplorer({
     setRoute(null);
     setActiveRouteId(null);
     setError(null);
+    setStartTempPoint(null);
+    setEndTempPoint(null);
   }, []);
 
   const handleRenameRoute = useCallback(
@@ -255,6 +281,59 @@ export default function RegionExplorer({
     setActiveRouteId(null);
     setError(null);
   }, []);
+
+  // --- Point picking handlers ---
+  const handlePickPointOnMap = useCallback((which: "start" | "end") => {
+    setPickingPoint(which);
+    // Mutual exclusion: exit compose mode and place creation mode
+    setComposing(false);
+    setSegments(null);
+    setSelectedSegmentIds([]);
+    setComposerError(null);
+    onExitPlaceCreation();
+  }, [onExitPlaceCreation]);
+
+  const handleMapPickPoint = useCallback((coords: [number, number]) => {
+    setPendingSavePointLocation(coords);
+    setPendingSavePointTarget(pickingPoint);
+    setPickingPoint(null);
+  }, [pickingPoint]);
+
+  const handleUseOnce = useCallback(() => {
+    if (!pendingSavePointLocation || !pendingSavePointTarget) return;
+    const tp: TempPoint = { coords: pendingSavePointLocation };
+    if (pendingSavePointTarget === "start") {
+      setStartTempPoint(tp);
+    } else {
+      setEndTempPoint(tp);
+    }
+    setPendingSavePointLocation(null);
+    setPendingSavePointTarget(null);
+  }, [pendingSavePointLocation, pendingSavePointTarget]);
+
+  const handleSaveAsPlace = useCallback(() => {
+    // Trigger the PlaceNameDialog flow by calling onPlaceCreate with the pending coords
+    if (!pendingSavePointLocation) return;
+    onPlaceCreate(pendingSavePointLocation);
+    // Keep pendingSavePointTarget so we know which field to auto-select after save
+    setPendingSavePointLocation(null);
+  }, [pendingSavePointLocation, onPlaceCreate]);
+
+  const handleClearTempPoint = useCallback((which: "start" | "end") => {
+    if (which === "start") {
+      setStartTempPoint(null);
+    } else {
+      setEndTempPoint(null);
+    }
+  }, []);
+
+  // When entering compose mode, clear picking mode
+  // When entering place creation mode, clear picking mode
+  useEffect(() => {
+    if (isCreatingPlace) {
+      setPickingPoint(null);
+    }
+  }, [isCreatingPlace]);
 
   // --- Composition: segment lookup map ---
   const segmentMap = useMemo(() => {
@@ -306,6 +385,7 @@ export default function RegionExplorer({
   // --- Composition handlers ---
   const handleStartComposing = useCallback(async () => {
     setComposing(true);
+    setPickingPoint(null);
     setRoute(null);
     setError(null);
     setSelectedSegmentIds([]);
@@ -462,7 +542,11 @@ export default function RegionExplorer({
         showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
-
+        startTempPoint={startTempPoint}
+        endTempPoint={endTempPoint}
+        onPickPointOnMap={handlePickPointOnMap}
+        onClearTempPoint={handleClearTempPoint}
+        autoSelectPlace={autoSelectPlace}
       />
       <PathMap
         region={region}
@@ -485,13 +569,43 @@ export default function RegionExplorer({
         composerError={composerError}
         composedStartPoint={composedStartPoint}
         composedEndPoint={composedEndPoint}
+        pickingPoint={pickingPoint}
+        onPickPoint={handleMapPickPoint}
+        startTempPoint={startTempPoint}
+        endTempPoint={endTempPoint}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog
           regionId={regionId}
           location={pendingPlaceLocation}
-          onCreated={onPlaceCreated}
-          onCancel={onCancelPlaceCreation}
+          onCreated={(place: Place) => {
+            // If this was triggered from a "Save as Place" flow, auto-select the place
+            if (pendingSavePointTarget) {
+              setAutoSelectPlace({ which: pendingSavePointTarget, placeId: place.id });
+              if (pendingSavePointTarget === "start") {
+                setStartTempPoint(null);
+              } else {
+                setEndTempPoint(null);
+              }
+              setPendingSavePointTarget(null);
+            }
+            onPlaceCreated(place);
+          }}
+          onCancel={() => {
+            setPendingSavePointTarget(null);
+            onCancelPlaceCreation();
+          }}
+        />
+      )}
+      {pendingSavePointLocation && (
+        <ConfirmDialog
+          title="Save as place?"
+          message="Would you like to save this point as a named place, or use it once for route generation?"
+          confirmLabel="Save as Place"
+          cancelLabel="Use Once"
+          variant="default"
+          onConfirm={handleSaveAsPlace}
+          onCancel={handleUseOnce}
         />
       )}
     </div>

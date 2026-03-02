@@ -5,6 +5,7 @@ interface ConfirmDialogProps {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  variant?: "destructive" | "default";
 }
 
 export default function ConfirmDialog({
@@ -14,7 +15,13 @@ export default function ConfirmDialog({
   cancelLabel,
   onConfirm,
   onCancel,
+  variant = "destructive",
 }: ConfirmDialogProps) {
+  const confirmClass =
+    variant === "destructive"
+      ? "rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+      : "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600";
+
   return (
     <div className="fixed inset-0 z-[1002] flex items-center justify-center bg-black/40">
       <div className="mx-4 w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
@@ -35,7 +42,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+            className={confirmClass}
           >
             {confirmLabel}
           </button>

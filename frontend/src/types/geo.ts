@@ -94,6 +94,8 @@ export interface RouteGenerateRequest {
   route_type?: RouteType;
   start_place_id?: number | null;
   end_place_id?: number | null;
+  start_coords?: [number, number] | null;
+  end_coords?: [number, number] | null;
 }
 
 export interface RouteResponse {

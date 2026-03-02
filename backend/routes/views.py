@@ -2,6 +2,7 @@
 
 import logging
 
+from django.contrib.gis.geos import Point
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -39,6 +40,15 @@ logger = logging.getLogger(__name__)
 MAX_SAVED_ROUTES_PER_REGION = 25
 
 
+def _validate_coords_in_region(
+    region: Region, lon: float, lat: float
+) -> None:
+    """Raise RouteGenerationError if the point falls outside the region boundary."""
+    point = Point(lon, lat, srid=4326)
+    if not region.boundary.contains(point):
+        raise RouteGenerationError("Selected point is outside the region boundary.")
+
+
 class RouteGenerateView(APIView):
     """Generate a walking route in a region."""
 
@@ -68,6 +78,8 @@ class RouteGenerateView(APIView):
 
         start_place_id = serializer.validated_data.get("start_place_id")
         end_place_id = serializer.validated_data.get("end_place_id")
+        start_coords = serializer.validated_data.get("start_coords")
+        end_coords = serializer.validated_data.get("end_coords")
 
         logger.info(
             "Route request: region_id=%d, target_distance_m=%.0f, route_type=%s",
@@ -87,6 +99,11 @@ class RouteGenerateView(APIView):
                 start_node_override = _find_nearest_node_at_distance(
                     region_id, start_place.location.x, start_place.location.y
                 )
+            elif start_coords is not None:
+                _validate_coords_in_region(region, start_coords[0], start_coords[1])
+                start_node_override = _find_nearest_node_at_distance(
+                    region_id, start_coords[0], start_coords[1]
+                )
 
             if end_place_id is not None and route_type == RouteType.ONE_WAY:
                 end_place = get_object_or_404(
@@ -94,6 +111,11 @@ class RouteGenerateView(APIView):
                 )
                 end_node_override = _find_nearest_node_at_distance(
                     region_id, end_place.location.x, end_place.location.y
+                )
+            elif end_coords is not None and route_type == RouteType.ONE_WAY:
+                _validate_coords_in_region(region, end_coords[0], end_coords[1])
+                end_node_override = _find_nearest_node_at_distance(
+                    region_id, end_coords[0], end_coords[1]
                 )
 
             result = generate_route(

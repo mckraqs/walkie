@@ -14,6 +14,7 @@ import type { Layer, PathOptions } from "leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+import type { TempPoint } from "@/components/RegionExplorer";
 import type {
   RegionFeature,
   PathFeature,
@@ -45,6 +46,10 @@ interface PathMapProps {
   composedStartPoint?: [number, number] | null;
   composedEndPoint?: [number, number] | null;
   showWalkedOnly?: boolean;
+  pickingPoint?: "start" | "end" | null;
+  onPickPoint?: (coords: [number, number]) => void;
+  startTempPoint?: TempPoint | null;
+  endTempPoint?: TempPoint | null;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -335,6 +340,62 @@ function PlaceCreationHandler({
   return null;
 }
 
+function PointPickingHandler({
+  onPickPoint,
+}: {
+  onPickPoint: (coords: [number, number]) => void;
+}) {
+  useMapEvents({
+    click: (e) => {
+      onPickPoint([e.latlng.lng, e.latlng.lat]);
+    },
+  });
+  return null;
+}
+
+function TempPointMarkers({
+  startTempPoint,
+  endTempPoint,
+}: {
+  startTempPoint?: TempPoint | null;
+  endTempPoint?: TempPoint | null;
+}) {
+  return (
+    <>
+      {startTempPoint && (
+        <CircleMarker
+          center={[startTempPoint.coords[1], startTempPoint.coords[0]]}
+          radius={8}
+          pathOptions={{
+            fillColor: "#f59e0b",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 1,
+            dashArray: "4 3",
+          }}
+        >
+          <Tooltip>Start (custom)</Tooltip>
+        </CircleMarker>
+      )}
+      {endTempPoint && (
+        <CircleMarker
+          center={[endTempPoint.coords[1], endTempPoint.coords[0]]}
+          radius={8}
+          pathOptions={{
+            fillColor: "#f59e0b",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 1,
+            dashArray: "4 3",
+          }}
+        >
+          <Tooltip>End (custom)</Tooltip>
+        </CircleMarker>
+      )}
+    </>
+  );
+}
+
 export default function PathMap({
   region,
   paths,
@@ -356,6 +417,10 @@ export default function PathMap({
   composedStartPoint,
   composedEndPoint,
   showWalkedOnly,
+  pickingPoint,
+  onPickPoint,
+  startTempPoint,
+  endTempPoint,
 }: PathMapProps) {
   const hasRoute = composing || (route && route.segments.features.length > 0);
   const totalSegments = hasRoute && route ? route.segments.features.length : 0;
@@ -544,7 +609,7 @@ export default function PathMap({
   );
 
   return (
-    <div className={`relative h-full w-full${isCreatingPlace ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
+    <div className={`relative h-full w-full${isCreatingPlace || pickingPoint ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
       <MapContainer
         center={[51.4, 21.1]}
         zoom={12}
@@ -560,9 +625,13 @@ export default function PathMap({
         {isCreatingPlace && (
           <PlaceCreationHandler onPlaceCreate={onPlaceCreate!} />
         )}
+        {pickingPoint && onPickPoint && (
+          <PointPickingHandler onPickPoint={onPickPoint} />
+        )}
         {showPlaces && places && places.length > 0 && (
           <PlaceMarkers places={places} />
         )}
+        <TempPointMarkers startTempPoint={startTempPoint} endTempPoint={endTempPoint} />
         {paths.features.length > 0 && (
           <GeoJSON
             key={`paths-${hasRoute ? "dimmed" : "normal"}`}

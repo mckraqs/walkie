@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { createPlace } from "@/lib/api";
+import type { Place } from "@/types/geo";
 
 interface PlaceNameDialogProps {
   regionId: string;
   location: [number, number];
-  onCreated: () => void;
+  onCreated: (place: Place) => void;
   onCancel: () => void;
 }
 
@@ -26,8 +27,8 @@ export default function PlaceNameDialog({
     setSaving(true);
     setError(null);
     try {
-      await createPlace(regionId, { name: name.trim(), location });
-      onCreated();
+      const place = await createPlace(regionId, { name: name.trim(), location });
+      onCreated(place);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create place");
     } finally {

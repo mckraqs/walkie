@@ -5,6 +5,7 @@ import SavedRoutes from "@/components/SavedRoutes";
 import RoutePlanner from "@/components/RoutePlanner";
 import RouteComposer from "@/components/RouteComposer";
 import PathList from "@/components/PathList";
+import type { TempPoint } from "@/components/RegionExplorer";
 import type {
   RouteResponse,
   RouteType,
@@ -21,7 +22,7 @@ interface SidePanelProps {
   route: RouteResponse | null;
   loading: boolean;
   error: string | null;
-  onGenerate: (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null) => void;
+  onGenerate: (distanceKm: number, routeType: RouteType, startPlaceId: number | null, endPlaceId: number | null, startCoords?: [number, number] | null, endCoords?: [number, number] | null) => void;
   onClear: () => void;
   places?: Place[];
   savedRoutes: RouteListItem[];
@@ -47,7 +48,11 @@ interface SidePanelProps {
   showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
-
+  startTempPoint: TempPoint | null;
+  endTempPoint: TempPoint | null;
+  onPickPointOnMap: (which: "start" | "end") => void;
+  onClearTempPoint: (which: "start" | "end") => void;
+  autoSelectPlace: { which: "start" | "end"; placeId: number } | null;
 }
 
 function computeSectionHeight(
@@ -103,6 +108,11 @@ export default function SidePanel({
   showWalkedOnly,
   hoveredPathId,
   onPathHover,
+  startTempPoint,
+  endTempPoint,
+  onPickPointOnMap,
+  onClearTempPoint,
+  autoSelectPlace,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
@@ -166,6 +176,11 @@ export default function SidePanel({
             collapsed={routePlannerCollapsed}
             onToggleCollapsed={() => setRoutePlannerCollapsed((c) => !c)}
             height={rpHeight}
+            startTempPoint={startTempPoint}
+            endTempPoint={endTempPoint}
+            onPickPointOnMap={onPickPointOnMap}
+            onClearTempPoint={onClearTempPoint}
+            autoSelectPlace={autoSelectPlace}
           />
           <RouteComposer
             isFavorite={isFavorite}
