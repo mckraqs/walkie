@@ -582,6 +582,24 @@ class TestRouteSegmentOrdering:
         for expected_seq, segment in enumerate(segments_qs):
             assert segment.sequence_index == expected_seq
 
+    def test_duplicate_segment_ids_preserved(
+        self, region_with_topology: Region
+    ) -> None:
+        """Duplicate segment IDs appear multiple times in the result."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+        ids_with_duplicates = [segment_ids[0], segment_ids[1], segment_ids[0]]
+        segments = get_route_segments(ids_with_duplicates)
+
+        retrieved_ids = [s.id for s in segments]
+        assert retrieved_ids == ids_with_duplicates
+        assert segments[0].sequence_index == 0
+        assert segments[1].sequence_index == 1
+        assert segments[2].sequence_index == 2
+
 
 @pytest.mark.django_db
 class TestBuildTopologyClean:
@@ -1062,6 +1080,36 @@ class TestRouteListCreateView:
         assert response.status_code == 400
         assert "connected" in response.json()["detail"].lower()
 
+    def test_create_custom_route_with_duplicate_segments(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST with duplicate segment IDs (dead-end retrace) succeeds."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        _build_test_topology()
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+        ids_with_duplicates = [segment_ids[0], segment_ids[1], segment_ids[0]]
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "Dead End Walk",
+                "segment_ids": ids_with_duplicates,
+                "total_distance": 300.0,
+                "is_loop": True,
+                "is_custom": True,
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+        route = Route.objects.get(pk=response.json()["id"])
+        assert route.segment_ids == ids_with_duplicates
+
     def test_list_includes_is_custom(
         self,
         region_with_topology: Region,
@@ -1238,6 +1286,17 @@ class TestValidateSegmentConnectivity:
     def test_empty_list(self) -> None:
         """Empty list returns True."""
         assert validate_segment_connectivity([]) is True
+
+    def test_duplicate_segment_ids(self, region_with_topology: Region) -> None:
+        """Duplicate segment IDs (dead-end retrace) are accepted."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+        # Walk segments 0,1 then retrace 1,0
+        ids_with_duplicates = [*segment_ids, segment_ids[1], segment_ids[0]]
+        assert validate_segment_connectivity(ids_with_duplicates) is True
 
 
 @pytest.mark.django_db
@@ -1727,6 +1786,19 @@ class TestStitchSegmentCoordinatesFromIds:
         """Empty segment_ids returns an empty list."""
         assert stitch_segment_coordinates_from_ids([]) == []
 
+    def test_dead_end_retrace(self, region_with_topology: Region) -> None:
+        """Duplicate segment IDs are stitched as an out-and-back path."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+        # Walk A, B, then retrace B, A
+        ids_retrace = [*segment_ids, segment_ids[1], segment_ids[0]]
+        coords = stitch_segment_coordinates_from_ids(ids_retrace)
+        # Should form a path that returns to the start
+        assert len(coords) > 0
+        assert coords[0] == coords[-1]
 
 @pytest.mark.django_db
 class TestShortestPathFallback:

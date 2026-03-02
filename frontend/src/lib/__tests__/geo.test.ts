@@ -114,6 +114,29 @@ describe("getRouteEndpoints", () => {
       endNode: 40,
     });
   });
+
+  it("handles consecutive duplicate segments (going back)", () => {
+    // Chain: 10 --A--> 20 --B--> 30, then B again (30-->20)
+    const segA = makeSegmentFeature(1, 10, 20);
+    const segB = makeSegmentFeature(2, 20, 30);
+    const map = buildMap(segA, segB);
+    expect(getRouteEndpoints([1, 2, 2], map)).toEqual({
+      startNode: 10,
+      endNode: 20,
+    });
+  });
+
+  it("handles dead-end round-trip as a loop", () => {
+    // Walk in: A(10->20), B(20->30), C(30->40)
+    // Walk back: C(40->30), B(30->20), A(20->10)
+    const segA = makeSegmentFeature(1, 10, 20);
+    const segB = makeSegmentFeature(2, 20, 30);
+    const segC = makeSegmentFeature(3, 30, 40);
+    const map = buildMap(segA, segB, segC);
+    const result = getRouteEndpoints([1, 2, 3, 3, 2, 1], map);
+    expect(result.startNode).toBe(10);
+    expect(result.endNode).toBe(10);
+  });
 });
 
 describe("getEndpointCoords", () => {
@@ -156,5 +179,24 @@ describe("getEndpointCoords", () => {
     const result = getEndpointCoords([1, 2], map);
     expect(result.start).toEqual([21.0, 52.0]);
     expect(result.end).toEqual([21.1, 52.1]);
+  });
+
+  it("returns correct coords for consecutive duplicate (going back)", () => {
+    // A: 10->20, coords [21.0,52.0]->[21.05,52.05]
+    // B: 20->30, coords [21.05,52.05]->[21.1,52.1]
+    // Route: [A, B, B] -> walk A forward, B forward, B backward
+    // End node = 20 (B's source), so end coord = B's source coord = [21.05,52.05]
+    const segA = makeSegmentFeature(1, 10, 20, [
+      [21.0, 52.0],
+      [21.05, 52.05],
+    ]);
+    const segB = makeSegmentFeature(2, 20, 30, [
+      [21.05, 52.05],
+      [21.1, 52.1],
+    ]);
+    const map = buildMap(segA, segB);
+    const result = getEndpointCoords([1, 2, 2], map);
+    expect(result.start).toEqual([21.0, 52.0]);
+    expect(result.end).toEqual([21.05, 52.05]);
   });
 });

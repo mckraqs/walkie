@@ -1,15 +1,16 @@
 """Route generation service using pgRouting."""
 
+import copy
 import enum
 import itertools
 import logging
 import math
 import random
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from django.db import connection
-from django.db.models import Case, IntegerField, OuterRef, QuerySet, Subquery, When
 
 from paths.models import PathSegment, Segment
 
@@ -184,27 +185,36 @@ def generate_route(
     return result
 
 
-def get_route_segments(segment_ids: list[int]) -> QuerySet[Segment]:
+def get_route_segments(segment_ids: list[int]) -> list[Segment]:
     """Fetch segments by IDs preserving the order from route generation.
+
+    Supports duplicate segment IDs (e.g. dead-end streets walked in both
+    directions). Each occurrence gets its own position-specific
+    ``sequence_index`` and ``path_id`` via shallow copy.
 
     Args:
         segment_ids: Ordered list of segment IDs from RouteResult.
 
     Returns:
-        QuerySet of Segment objects ordered by the input sequence.
+        List of Segment objects ordered by the input sequence.
     """
-    ordering = Case(
-        *[When(pk=pk, then=pos) for pos, pk in enumerate(segment_ids)],
-        output_field=IntegerField(),
+    unique_ids = set(segment_ids)
+    seg_map = {s.pk: s for s in Segment.objects.filter(pk__in=unique_ids)}
+    path_id_map = dict(
+        PathSegment.objects.filter(segment_id__in=unique_ids).values_list(
+            "segment_id", "path_id"
+        )
     )
-    path_id_subquery = Subquery(
-        PathSegment.objects.filter(segment=OuterRef("pk")).values("path_id")[:1]
-    )
-    return (
-        Segment.objects.filter(pk__in=segment_ids)
-        .annotate(sequence_index=ordering, path_id=path_id_subquery)
-        .order_by(ordering)
-    )
+    result: list[Segment] = []
+    for pos, seg_id in enumerate(segment_ids):
+        seg = seg_map.get(seg_id)
+        if seg is None:
+            continue
+        seg_copy = copy.copy(seg)
+        seg_copy.sequence_index = pos  # type: ignore[attr-defined]
+        seg_copy.path_id = path_id_map.get(seg_id)  # type: ignore[attr-defined]
+        result.append(seg_copy)
+    return result
 
 
 def get_route_path_names(segment_ids: list[int]) -> list[str]:
@@ -253,7 +263,7 @@ def get_route_path_ids(segment_ids: list[int]) -> list[int]:
 
 
 def stitch_segment_coordinates(
-    segments: QuerySet[Segment],
+    segments: Iterable[Segment],
 ) -> list[tuple[float, float]]:
     """Merge ordered segment geometries into a single coordinate list.
 
@@ -343,7 +353,7 @@ def stitch_segment_coordinates_from_ids(
     return coords
 
 
-def build_gpx_xml(name: str, segments: QuerySet[Segment]) -> str:
+def build_gpx_xml(name: str, segments: Iterable[Segment]) -> str:
     """Build a GPX 1.1 XML document from a route name and ordered segments.
 
     Args:
@@ -375,7 +385,7 @@ def build_gpx_xml(name: str, segments: QuerySet[Segment]) -> str:
     return ET.tostring(gpx, encoding="unicode", xml_declaration=True)
 
 
-def build_kml_xml(name: str, segments: QuerySet[Segment]) -> str:
+def build_kml_xml(name: str, segments: Iterable[Segment]) -> str:
     """Build a KML 2.2 XML document from a route name and ordered segments.
 
     Args:

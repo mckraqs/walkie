@@ -40,9 +40,7 @@ logger = logging.getLogger(__name__)
 MAX_SAVED_ROUTES_PER_REGION = 25
 
 
-def _validate_coords_in_region(
-    region: Region, lon: float, lat: float
-) -> None:
+def _validate_coords_in_region(region: Region, lon: float, lat: float) -> None:
     """Raise RouteGenerationError if the point falls outside the region boundary."""
     point = Point(lon, lat, srid=4326)
     if not region.boundary.contains(point):
@@ -101,7 +99,7 @@ class RouteGenerateView(APIView):
                 )
             elif start_coords is not None:
                 _validate_coords_in_region(region, start_coords[0], start_coords[1])
-                start_node_override = _find_nearest_node_at_distance(
+                start_node_override = _find_random_node_near_place(
                     region_id, start_coords[0], start_coords[1]
                 )
 
@@ -114,7 +112,7 @@ class RouteGenerateView(APIView):
                 )
             elif end_coords is not None and route_type == RouteType.ONE_WAY:
                 _validate_coords_in_region(region, end_coords[0], end_coords[1])
-                end_node_override = _find_nearest_node_at_distance(
+                end_node_override = _find_random_node_near_place(
                     region_id, end_coords[0], end_coords[1]
                 )
 
@@ -204,7 +202,7 @@ class RouteListCreateView(APIView):
         existing_count = Segment.objects.filter(
             pk__in=segment_ids, region=region
         ).count()
-        if existing_count != len(segment_ids):
+        if existing_count != len(set(segment_ids)):
             return Response(
                 {"detail": "One or more segment IDs do not belong to this region."},
                 status=status.HTTP_400_BAD_REQUEST,

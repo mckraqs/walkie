@@ -25,7 +25,12 @@ export function haversineDistance(
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/** Get the start and end graph-node IDs of a segment chain. */
+/** Get the start and end graph-node IDs of a segment chain.
+ *
+ * Traces the chain segment-by-segment, tracking which node we arrive at
+ * after each step. This correctly handles duplicate (retraced) segments
+ * such as dead-end streets walked in both directions.
+ */
 export function getRouteEndpoints(
   segIds: number[],
   segMap: Map<number, SegmentFeature>,
@@ -39,29 +44,46 @@ export function getRouteEndpoints(
       endNode: seg.properties.target,
     };
   }
+
   const first = segMap.get(segIds[0]);
   const second = segMap.get(segIds[1]);
   if (!first || !second) return { startNode: null, endNode: null };
-  const secondNodes = new Set([
-    second.properties.source,
-    second.properties.target,
-  ]);
-  const startNode = secondNodes.has(first.properties.source)
-    ? first.properties.target
-    : first.properties.source;
 
-  const last = segMap.get(segIds[segIds.length - 1]);
-  const secondToLast = segMap.get(segIds[segIds.length - 2]);
-  if (!last || !secondToLast) return { startNode, endNode: null };
-  const stlNodes = new Set([
-    secondToLast.properties.source,
-    secondToLast.properties.target,
-  ]);
-  const endNode = stlNodes.has(last.properties.source)
-    ? last.properties.target
-    : last.properties.source;
+  // Determine initial traversal direction from the first two segments
+  let startNode: number;
+  let currentNode: number;
 
-  return { startNode, endNode };
+  if (segIds[0] === segIds[1]) {
+    // Same segment repeated (immediate backtrack): pick source as start
+    startNode = first.properties.source;
+    currentNode = first.properties.target;
+  } else {
+    const secondNodes = new Set([
+      second.properties.source,
+      second.properties.target,
+    ]);
+    if (secondNodes.has(first.properties.source)) {
+      startNode = first.properties.target;
+      currentNode = first.properties.source;
+    } else {
+      startNode = first.properties.source;
+      currentNode = first.properties.target;
+    }
+  }
+
+  // Walk through remaining segments, flipping direction at each step
+  for (let i = 1; i < segIds.length; i++) {
+    const seg = segMap.get(segIds[i]);
+    if (!seg) return { startNode, endNode: null };
+
+    if (currentNode === seg.properties.source) {
+      currentNode = seg.properties.target;
+    } else {
+      currentNode = seg.properties.source;
+    }
+  }
+
+  return { startNode, endNode: currentNode };
 }
 
 /** Get the geographic coordinates of the start and end of a segment chain. */

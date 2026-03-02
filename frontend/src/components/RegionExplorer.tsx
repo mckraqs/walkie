@@ -357,13 +357,6 @@ export default function RegionExplorer({
       // If empty route, accept any segment
       if (prev.length === 0) return [segmentId];
 
-      // If already selected at start, remove from start
-      if (prev[0] === segmentId) return prev.slice(1);
-      // If already selected at end, remove from end
-      if (prev[prev.length - 1] === segmentId) return prev.slice(0, -1);
-      // If selected in the middle, ignore
-      if (prev.includes(segmentId)) return prev;
-
       const newSeg = segmentMap.get(segmentId);
       if (!newSeg) return prev;
 
