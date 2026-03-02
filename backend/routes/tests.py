@@ -14,12 +14,19 @@ from routes.services import (
     RouteGenerationError,
     RouteType,
     _build_penalized_edges_sql,
+    _build_penalized_randomized_edges_sql,
+    _build_randomized_edges_sql,
+    _compute_bearing,
+    _compute_loop_waypoint_count,
+    _compute_waypoint_count,
+    _find_random_node_near_place,
     _get_node_coordinates,
     _pick_random_source_node,
     generate_route,
     get_route_path_names,
     get_route_segments,
     stitch_segment_coordinates,
+    stitch_segment_coordinates_from_ids,
     validate_segment_connectivity,
 )
 from users.models import FavoriteRegion
@@ -1547,3 +1554,175 @@ class TestRouteExport:
         assert coords[0] == (20.0, 50.0)
         assert coords[1] == (20.001, 50.0)
         assert coords[2] == (20.002, 50.0)
+
+
+@pytest.mark.django_db
+class TestBuildRandomizedEdgesSql:
+    """Tests for _build_randomized_edges_sql."""
+
+    def test_contains_random(self, region_with_topology: Region) -> None:
+        """Randomized SQL includes PostgreSQL random() calls."""
+        sql = _build_randomized_edges_sql(region_with_topology.pk)
+        assert "random()" in sql
+
+    def test_is_executable(self, region_with_topology: Region) -> None:
+        """Randomized edges SQL can be executed against the database."""
+        sql = _build_randomized_edges_sql(region_with_topology.pk)
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        assert len(rows) > 0
+
+    def test_custom_jitter(self, region_with_topology: Region) -> None:
+        """Custom jitter value is reflected in the SQL."""
+        sql = _build_randomized_edges_sql(region_with_topology.pk, jitter=0.3)
+        assert "0.85" in sql  # 1.0 - 0.3/2
+        assert "0.3" in sql
+
+
+@pytest.mark.django_db
+class TestBuildPenalizedRandomizedEdgesSql:
+    """Tests for _build_penalized_randomized_edges_sql."""
+
+    def test_contains_penalty_and_random(self, region_with_topology: Region) -> None:
+        """Penalized+randomized SQL contains CASE WHEN and random()."""
+        segments = Segment.objects.filter(region=region_with_topology)
+        first_id = segments.first().pk  # type: ignore[union-attr]
+        sql = _build_penalized_randomized_edges_sql(
+            region_with_topology.pk, [first_id], 5.0
+        )
+        assert "CASE WHEN" in sql
+        assert "random()" in sql
+        assert str(first_id) in sql
+        assert "5.0" in sql
+
+    def test_is_executable(self, region_with_topology: Region) -> None:
+        """Penalized+randomized edges SQL can be executed."""
+        segments = Segment.objects.filter(region=region_with_topology)
+        first_id = segments.first().pk  # type: ignore[union-attr]
+        sql = _build_penalized_randomized_edges_sql(
+            region_with_topology.pk, [first_id], 5.0
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        assert len(rows) > 0
+
+
+@pytest.mark.django_db
+class TestFindRandomNodeNearPlace:
+    """Tests for _find_random_node_near_place."""
+
+    def test_returns_node_within_radius(self, region_with_topology: Region) -> None:
+        """Returns a valid node when nodes exist within the radius."""
+        node = _find_random_node_near_place(
+            region_with_topology.pk, 20.0005, 50.0, 1000.0
+        )
+        assert isinstance(node, int)
+
+    def test_falls_back_to_nearest(self, region_with_topology: Region) -> None:
+        """Falls back to nearest node when none within small radius."""
+        node = _find_random_node_near_place(region_with_topology.pk, 21.0, 51.0, 1.0)
+        assert isinstance(node, int)
+
+    def test_raises_for_empty_region(self, region_with_topology: Region) -> None:
+        """Raises RouteGenerationError when region has no nodes."""
+        with pytest.raises(RouteGenerationError, match="No network nodes"):
+            _find_random_node_near_place(999999, 20.0, 50.0)
+
+
+class TestComputeBearing:
+    """Tests for _compute_bearing."""
+
+    def test_north(self) -> None:
+        """Bearing to a point due north is ~0 degrees."""
+        bearing = _compute_bearing(0.0, 0.0, 0.0, 1.0)
+        assert abs(bearing - 0.0) < 1.0
+
+    def test_east(self) -> None:
+        """Bearing to a point due east is ~90 degrees."""
+        bearing = _compute_bearing(0.0, 0.0, 1.0, 0.0)
+        assert abs(bearing - 90.0) < 1.0
+
+    def test_south(self) -> None:
+        """Bearing to a point due south is ~180 degrees."""
+        bearing = _compute_bearing(0.0, 1.0, 0.0, 0.0)
+        assert abs(bearing - 180.0) < 1.0
+
+    def test_west(self) -> None:
+        """Bearing to a point due west is ~270 degrees."""
+        bearing = _compute_bearing(0.0, 0.0, -1.0, 0.0)
+        assert abs(bearing - 270.0) < 1.0
+
+    def test_result_in_range(self) -> None:
+        """Bearing is always in [0, 360)."""
+        for dest_lon, dest_lat in [(1, 1), (-1, 1), (-1, -1), (1, -1)]:
+            bearing = _compute_bearing(0.0, 0.0, float(dest_lon), float(dest_lat))
+            assert 0 <= bearing < 360
+
+
+class TestComputeWaypointCount:
+    """Tests for _compute_waypoint_count."""
+
+    def test_short_distance(self) -> None:
+        """Distances under 2km get 0 waypoints."""
+        assert _compute_waypoint_count(1000.0) == 0
+
+    def test_medium_distance(self) -> None:
+        """Distances 2-5km get 1 waypoint."""
+        assert _compute_waypoint_count(3000.0) == 1
+
+    def test_long_distance(self) -> None:
+        """Distances over 5km get 2 waypoints."""
+        assert _compute_waypoint_count(6000.0) == 2
+
+    def test_threshold_boundary(self) -> None:
+        """At exactly 2000m, returns 1 waypoint."""
+        assert _compute_waypoint_count(2000.0) == 1
+
+
+class TestComputeLoopWaypointCount:
+    """Tests for _compute_loop_waypoint_count."""
+
+    def test_short_distance(self) -> None:
+        """Distances under 2km get 2 waypoints."""
+        assert _compute_loop_waypoint_count(1000.0) == 2
+
+    def test_medium_distance(self) -> None:
+        """Distances 2-5km get 3 waypoints."""
+        assert _compute_loop_waypoint_count(3000.0) == 3
+
+    def test_long_distance(self) -> None:
+        """Distances over 5km get 4 waypoints."""
+        assert _compute_loop_waypoint_count(6000.0) == 4
+
+
+@pytest.mark.django_db
+class TestStitchSegmentCoordinatesFromIds:
+    """Tests for stitch_segment_coordinates_from_ids."""
+
+    def test_basic_stitching(self, region_with_topology: Region) -> None:
+        """Stitching from IDs produces a non-empty coordinate list."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        coords = stitch_segment_coordinates_from_ids(segment_ids)
+        assert len(coords) > 0
+
+    def test_handles_duplicates(self, region_with_topology: Region) -> None:
+        """Duplicate segment IDs are stitched independently."""
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology)
+            .order_by("pk")
+            .values_list("pk", flat=True)[:2]
+        )
+        coords_no_dup = stitch_segment_coordinates_from_ids(segment_ids)
+        ids_with_dup = [*segment_ids, segment_ids[0]]
+        coords_with_dup = stitch_segment_coordinates_from_ids(ids_with_dup)
+        assert len(coords_with_dup) >= len(coords_no_dup)
+
+    def test_empty_list(self) -> None:
+        """Empty segment_ids returns an empty list."""
+        assert stitch_segment_coordinates_from_ids([]) == []

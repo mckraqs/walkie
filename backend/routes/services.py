@@ -19,7 +19,13 @@ LOOP_CLOSURE_TOLERANCE_M = 250
 PROXIMITY_TOLERANCE_M = 100
 RETRACE_PENALTY_FACTOR = 5.0
 LOOP_DISTANCE_FRACTION = 0.45
-PLACE_NODE_TARGET_DISTANCE_M = 300.0
+PLACE_NODE_MAX_DISTANCE_M = 300.0
+TARGET_CANDIDATE_POOL_SIZE = 15
+EDGE_COST_JITTER = 0.6
+WAYPOINT_DISTANCE_THRESHOLD_M = 2000.0
+MAX_ONE_WAY_WAYPOINTS = 2
+LOOP_MIN_WAYPOINTS = 2
+LOOP_MAX_WAYPOINTS = 4
 
 
 class RouteType(enum.StrEnum):
@@ -46,27 +52,26 @@ class RouteResult:
     is_loop: bool = False
 
 
-def _find_nearest_node_at_distance(
+def _find_random_node_near_place(
     region_id: int,
     place_lon: float,
     place_lat: float,
-    target_distance_m: float = PLACE_NODE_TARGET_DISTANCE_M,
+    max_distance_m: float = PLACE_NODE_MAX_DISTANCE_M,
 ) -> int:
-    """Find the network node closest to a target distance from a place.
+    """Find a random network node within a radius of a place.
 
-    Queries the segment topology nodes filtered by region and finds
-    the node whose geographic distance from the place is closest to
-    the target distance (default 300m), simulating a short walk to
-    the trail network.
+    Selects a random node within ``max_distance_m`` of the place using
+    ``ST_DWithin``. Falls back to the nearest node if none are within
+    the radius.
 
     Args:
         region_id: The region to search nodes in.
         place_lon: Longitude of the place.
         place_lat: Latitude of the place.
-        target_distance_m: Target distance from place to node in meters.
+        max_distance_m: Maximum distance from place to node in meters.
 
     Returns:
-        The best node ID.
+        A node ID.
 
     Raises:
         RouteGenerationError: If no nodes are found in the region.
@@ -75,8 +80,34 @@ def _find_nearest_node_at_distance(
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, dist
-            FROM (
+            SELECT id FROM (
+                SELECT DISTINCT v.id
+                FROM segments_vertices_pgr v
+                JOIN segments s ON (v.id = s.source OR v.id = s.target)
+                WHERE s.region_id = %s
+                    AND s.source IS NOT NULL
+                    AND s.target IS NOT NULL
+                    AND ST_DWithin(
+                        v.the_geom::geography,
+                        ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
+                        %s
+                    )
+            ) sub
+            ORDER BY random()
+            LIMIT 1
+            """,
+            [safe_id, place_lon, place_lat, max_distance_m],
+        )
+        row = cursor.fetchone()
+
+    if row is not None:
+        return row[0]
+
+    # Fallback: nearest node
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, dist FROM (
                 SELECT DISTINCT v.id,
                     ST_Distance(
                         v.the_geom::geography,
@@ -88,10 +119,10 @@ def _find_nearest_node_at_distance(
                     AND s.source IS NOT NULL
                     AND s.target IS NOT NULL
             ) sub
-            ORDER BY ABS(dist - %s)
+            ORDER BY dist
             LIMIT 1
             """,
-            [place_lon, place_lat, safe_id, target_distance_m],
+            [place_lon, place_lat, safe_id],
         )
         row = cursor.fetchone()
 
@@ -238,6 +269,57 @@ def stitch_segment_coordinates(
     coords: list[tuple[float, float]] = []
     for segment in segments:
         seg_coords = list(segment.geometry.coords)
+        if not coords:
+            coords.extend(seg_coords)
+            continue
+
+        last = coords[-1]
+        first_pt = seg_coords[0]
+        last_pt = seg_coords[-1]
+
+        dist_to_first = math.hypot(last[0] - first_pt[0], last[1] - first_pt[1])
+        dist_to_last = math.hypot(last[0] - last_pt[0], last[1] - last_pt[1])
+
+        if dist_to_last < dist_to_first:
+            seg_coords = list(reversed(seg_coords))
+
+        # Skip duplicate junction point
+        if seg_coords[0] == last:
+            seg_coords = seg_coords[1:]
+
+        coords.extend(seg_coords)
+    return coords
+
+
+def stitch_segment_coordinates_from_ids(
+    segment_ids: list[int],
+) -> list[tuple[float, float]]:
+    """Merge segment geometries by ID list into a single coordinate list.
+
+    Unlike ``stitch_segment_coordinates``, this works from a segment ID list
+    that may contain duplicates (e.g., routes with self-intersections).
+    Each occurrence of a segment ID is stitched independently.
+
+    Args:
+        segment_ids: Ordered list of segment IDs (may contain duplicates).
+
+    Returns:
+        List of (lon, lat) coordinate tuples forming one continuous line.
+    """
+    if not segment_ids:
+        return []
+
+    unique_ids = set(segment_ids)
+    geometry_map: dict[int, list[tuple[float, float]]] = {}
+    for seg in Segment.objects.filter(pk__in=unique_ids):
+        geometry_map[seg.pk] = list(seg.geometry.coords)
+
+    coords: list[tuple[float, float]] = []
+    for seg_id in segment_ids:
+        seg_coords = list(geometry_map.get(seg_id, []))
+        if not seg_coords:
+            continue
+
         if not coords:
             coords.extend(seg_coords)
             continue
@@ -419,7 +501,16 @@ def _generate_one_way_route(
     start_node_override: int | None = None,
     end_node_override: int | None = None,
 ) -> RouteResult:
-    """Generate a one-way route from a random source to a distant target."""
+    """Generate a one-way route with optional intermediate waypoints.
+
+    For longer routes, inserts intermediate waypoints to increase variety:
+    - < 2km: direct path (randomized costs alone provide variation)
+    - 2-5km: 1 intermediate waypoint
+    - > 5km: 2 intermediate waypoints
+
+    Each leg uses fresh randomized edge costs, and duplicate segments
+    (self-intersections) are allowed.
+    """
     source_node = (
         start_node_override
         if start_node_override is not None
@@ -430,14 +521,29 @@ def _generate_one_way_route(
         if end_node_override is not None
         else _find_best_target_node(region_id, source_node, target_distance_m)
     )
-    result = _compute_shortest_path(region_id, source_node, target_node)
+
+    wp_count = _compute_waypoint_count(target_distance_m)
+    waypoints = _pick_intermediate_waypoints(
+        region_id, source_node, target_distance_m, wp_count
+    )
+
+    chain = [source_node, *waypoints, target_node]
+
+    legs: list[RouteResult] = []
+    for i in range(len(chain) - 1):
+        leg = _compute_shortest_path(region_id, chain[i], chain[i + 1])
+        legs.append(leg)
+
+    all_segment_ids = [sid for leg in legs for sid in leg.segment_ids]
+    total_distance = sum(compute_segment_distance(leg.segment_ids) for leg in legs)
+
     start_point = _get_node_coordinates(source_node)
     end_point = _get_node_coordinates(target_node)
     return RouteResult(
-        segment_ids=result.segment_ids,
-        total_distance=result.total_distance,
-        start_node=result.start_node,
-        end_node=result.end_node,
+        segment_ids=all_segment_ids,
+        total_distance=total_distance,
+        start_node=source_node,
+        end_node=target_node,
         start_point=start_point,
         end_point=end_point,
     )
@@ -448,18 +554,19 @@ def _generate_loop_route(
     target_distance_m: float,
     start_node_override: int | None = None,
 ) -> RouteResult:
-    """Generate a loop route that returns near the starting point.
+    """Generate a loop route using a multi-waypoint circuit.
 
-    Uses a two-leg algorithm:
-    1. Find a target node at ~45% of target distance from source.
-    2. Compute outbound leg S -> T via standard Dijkstra.
-    3. Compute return leg T -> S with penalized edges on outbound segments.
-    4. Combine both legs and validate closure.
+    Selects waypoints sorted by bearing angle from the source to form
+    a coherent circuit. Each subsequent leg penalizes segments from all
+    previous legs (accumulated penalty), encouraging use of new streets.
+    Self-intersections are allowed.
+
+    Falls back to the two-leg approach if waypoint selection fails.
 
     Args:
         region_id: The region to route in.
         target_distance_m: Target total loop distance in meters.
-        start_node_override: If set, use this node as the loop start instead of random.
+        start_node_override: If set, use this node as the loop start.
 
     Returns:
         A RouteResult with is_loop=True.
@@ -472,27 +579,88 @@ def _generate_loop_route(
         if start_node_override is not None
         else _pick_random_source_node(region_id)
     )
+
+    wp_count = _compute_loop_waypoint_count(target_distance_m)
+    waypoints = _pick_loop_waypoints(
+        region_id, source_node, target_distance_m, wp_count
+    )
+
+    if not waypoints:
+        return _generate_loop_route_fallback(region_id, target_distance_m, source_node)
+
+    chain = [source_node, *waypoints, source_node]
+
+    legs: list[RouteResult] = []
+    accumulated_penalty_ids: list[int] = []
+    for i in range(len(chain) - 1):
+        if accumulated_penalty_ids:
+            edges_sql: str | None = _build_penalized_randomized_edges_sql(
+                region_id, accumulated_penalty_ids, RETRACE_PENALTY_FACTOR
+            )
+        else:
+            edges_sql = None  # default randomized edges
+
+        leg = _compute_shortest_path(
+            region_id, chain[i], chain[i + 1], edges_sql=edges_sql
+        )
+        legs.append(leg)
+        accumulated_penalty_ids.extend(leg.segment_ids)
+
+    all_segment_ids = [sid for leg in legs for sid in leg.segment_ids]
+    total_distance = sum(compute_segment_distance(leg.segment_ids) for leg in legs)
+
+    start_point = _get_node_coordinates(source_node)
+    end_point = _get_node_coordinates(source_node)
+
+    return RouteResult(
+        segment_ids=all_segment_ids,
+        total_distance=total_distance,
+        start_node=source_node,
+        end_node=source_node,
+        start_point=start_point,
+        end_point=end_point,
+        is_loop=True,
+    )
+
+
+def _generate_loop_route_fallback(
+    region_id: int,
+    target_distance_m: float,
+    source_node: int,
+) -> RouteResult:
+    """Fallback two-leg loop route with randomized costs.
+
+    Used when multi-waypoint selection fails. Routes outbound to a
+    target node and returns via penalized + randomized edges.
+
+    Args:
+        region_id: The region to route in.
+        target_distance_m: Target total loop distance in meters.
+        source_node: Loop start/end node.
+
+    Returns:
+        A RouteResult with is_loop=True.
+
+    Raises:
+        RouteGenerationError: If the loop cannot be formed.
+    """
     outbound_distance = target_distance_m * LOOP_DISTANCE_FRACTION
     target_node = _find_best_target_node(region_id, source_node, outbound_distance)
 
     outbound = _compute_shortest_path(region_id, source_node, target_node)
 
-    penalized_sql = _build_penalized_edges_sql(
+    penalized_sql = _build_penalized_randomized_edges_sql(
         region_id, outbound.segment_ids, RETRACE_PENALTY_FACTOR
     )
     return_result = _compute_shortest_path(
         region_id, target_node, source_node, edges_sql=penalized_sql
     )
 
+    outbound_distance_actual = compute_segment_distance(outbound.segment_ids)
     return_distance = compute_segment_distance(return_result.segment_ids)
-    total_distance = outbound.total_distance + return_distance
+    total_distance = outbound_distance_actual + return_distance
 
-    seen: set[int] = set()
-    combined_ids: list[int] = []
-    for seg_id in outbound.segment_ids + return_result.segment_ids:
-        if seg_id not in seen:
-            seen.add(seg_id)
-            combined_ids.append(seg_id)
+    combined_ids = outbound.segment_ids + return_result.segment_ids
 
     end_node = return_result.end_node
     if end_node != source_node:
@@ -545,6 +713,40 @@ def _build_edges_sql(region_id: int) -> str:
     """
 
 
+def _build_randomized_edges_sql(
+    region_id: int,
+    *,
+    jitter: float = EDGE_COST_JITTER,
+) -> str:
+    """Build edges SQL with random cost jitter for route variation.
+
+    Multiplies each edge cost by a random factor in the range
+    ``[1 - jitter/2, 1 + jitter/2]``. PostgreSQL's ``random()`` is
+    evaluated once per row when pgRouting reads the subquery, so costs
+    are consistent within a single routing call but different across calls.
+
+    Args:
+        region_id: Region to filter segments by.
+        jitter: Width of the jitter range (default 0.6 gives 0.7x-1.3x).
+
+    Returns:
+        SQL string for use as pgRouting edges query.
+    """
+    safe_id = int(region_id)
+    safe_jitter = float(jitter)
+    low = 1.0 - safe_jitter / 2
+    jitter_expr = f"({low} + random() * {safe_jitter})"
+    return f"""
+        SELECT id, source, target,
+            ST_Length(geometry::geography) * {jitter_expr} AS cost,
+            ST_Length(geometry::geography) * {jitter_expr} AS reverse_cost
+        FROM segments
+        WHERE region_id = {safe_id}
+            AND source IS NOT NULL
+            AND target IS NOT NULL
+    """
+
+
 def _build_penalized_edges_sql(
     region_id: int,
     penalized_segment_ids: list[int],
@@ -575,6 +777,52 @@ def _build_penalized_edges_sql(
             CASE WHEN id IN ({id_list})
                 THEN ST_Length(geometry::geography) * {safe_factor}
                 ELSE ST_Length(geometry::geography)
+            END AS reverse_cost
+        FROM segments
+        WHERE region_id = {safe_id}
+            AND source IS NOT NULL
+            AND target IS NOT NULL
+    """
+
+
+def _build_penalized_randomized_edges_sql(
+    region_id: int,
+    penalized_segment_ids: list[int],
+    penalty_factor: float,
+    *,
+    jitter: float = EDGE_COST_JITTER,
+) -> str:
+    """Build edges SQL combining penalty and random jitter.
+
+    Penalized segments get cost multiplied by ``penalty_factor``, and all
+    segments get additional random jitter for route variation.
+
+    Args:
+        region_id: Region to filter segments by.
+        penalized_segment_ids: Segment IDs to penalize.
+        penalty_factor: Multiplier applied to penalized segment costs.
+        jitter: Width of the jitter range.
+
+    Returns:
+        SQL string for use as pgRouting edges query.
+    """
+    safe_id = int(region_id)
+    safe_factor = float(penalty_factor)
+    safe_jitter = float(jitter)
+    low = 1.0 - safe_jitter / 2
+    id_list = ", ".join(str(int(sid)) for sid in penalized_segment_ids)
+    jitter_expr = f"({low} + random() * {safe_jitter})"
+    penalty_expr = f"ST_Length(geometry::geography) * {safe_factor}"
+    base_expr = "ST_Length(geometry::geography)"
+    return f"""
+        SELECT id, source, target,
+            CASE WHEN id IN ({id_list})
+                THEN {penalty_expr} * {jitter_expr}
+                ELSE {base_expr} * {jitter_expr}
+            END AS cost,
+            CASE WHEN id IN ({id_list})
+                THEN {penalty_expr} * {jitter_expr}
+                ELSE {base_expr} * {jitter_expr}
             END AS reverse_cost
         FROM segments
         WHERE region_id = {safe_id}
@@ -705,7 +953,7 @@ def _find_best_target_node(
     """Find the node closest to the target distance from source.
 
     Uses pgr_drivingDistance with 20% overshoot tolerance, then picks
-    the node whose aggregate cost is closest to the target distance.
+    a random node from the top candidates closest to the target distance.
 
     Args:
         region_id: The region to route in.
@@ -723,12 +971,12 @@ def _find_best_target_node(
 
     with connection.cursor() as cursor:
         cursor.execute(
-            """
+            f"""
             SELECT node, agg_cost
             FROM pgr_drivingDistance(%s, %s, %s, directed := false)
             WHERE node != %s
             ORDER BY ABS(agg_cost - %s)
-            LIMIT 5
+            LIMIT {TARGET_CANDIDATE_POOL_SIZE}
             """,
             [edges_sql, source_node, max_cost, source_node, target_distance_m],
         )
@@ -753,12 +1001,15 @@ def _compute_shortest_path(
 ) -> RouteResult:
     """Compute the shortest path between two nodes using Dijkstra.
 
+    When no ``edges_sql`` is provided, uses randomized edge costs
+    so that repeated calls produce different routes.
+
     Args:
         region_id: The region to route in.
         source_node: Starting node ID.
         target_node: Ending node ID.
-        edges_sql: Optional custom edges SQL. When provided, skip calling
-            ``_build_edges_sql``.
+        edges_sql: Optional custom edges SQL. When provided, skip building
+            default randomized edges.
 
     Returns:
         A RouteResult with ordered edge IDs and total distance.
@@ -767,7 +1018,7 @@ def _compute_shortest_path(
         RouteGenerationError: If no path exists between the nodes.
     """
     if edges_sql is None:
-        edges_sql = _build_edges_sql(region_id)
+        edges_sql = _build_randomized_edges_sql(region_id)
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -797,3 +1048,196 @@ def _compute_shortest_path(
         start_node=source_node,
         end_node=target_node,
     )
+
+
+def _compute_bearing(
+    origin_lon: float,
+    origin_lat: float,
+    dest_lon: float,
+    dest_lat: float,
+) -> float:
+    """Compute the initial bearing from origin to destination.
+
+    Args:
+        origin_lon: Longitude of the origin point.
+        origin_lat: Latitude of the origin point.
+        dest_lon: Longitude of the destination point.
+        dest_lat: Latitude of the destination point.
+
+    Returns:
+        Bearing in degrees [0, 360).
+    """
+    lat1 = math.radians(origin_lat)
+    lat2 = math.radians(dest_lat)
+    d_lon = math.radians(dest_lon - origin_lon)
+
+    x = math.sin(d_lon) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - (
+        math.sin(lat1) * math.cos(lat2) * math.cos(d_lon)
+    )
+
+    bearing = math.degrees(math.atan2(x, y))
+    return bearing % 360
+
+
+def _compute_waypoint_count(target_distance_m: float) -> int:
+    """Determine the number of intermediate waypoints for a one-way route.
+
+    Args:
+        target_distance_m: Target route distance in meters.
+
+    Returns:
+        Number of waypoints (0, 1, or 2).
+    """
+    if target_distance_m < WAYPOINT_DISTANCE_THRESHOLD_M:
+        return 0
+    if target_distance_m <= 5000.0:
+        return 1
+    return MAX_ONE_WAY_WAYPOINTS
+
+
+def _compute_loop_waypoint_count(target_distance_m: float) -> int:
+    """Determine the number of waypoints for a loop route.
+
+    Args:
+        target_distance_m: Target route distance in meters.
+
+    Returns:
+        Number of waypoints (2, 3, or 4).
+    """
+    if target_distance_m < WAYPOINT_DISTANCE_THRESHOLD_M:
+        return LOOP_MIN_WAYPOINTS
+    if target_distance_m <= 5000.0:
+        return 3
+    return LOOP_MAX_WAYPOINTS
+
+
+def _pick_intermediate_waypoints(
+    region_id: int,
+    source_node: int,
+    target_distance_m: float,
+    count: int,
+) -> list[int]:
+    """Pick intermediate waypoints at evenly-spaced distance fractions.
+
+    Uses ``pgr_drivingDistance`` from source and selects random nodes
+    near the target distances (within 30% tolerance band).
+
+    Args:
+        region_id: The region to route in.
+        source_node: Starting node ID.
+        target_distance_m: Total target route distance.
+        count: Number of waypoints to pick.
+
+    Returns:
+        List of waypoint node IDs (may be shorter than ``count``
+        if insufficient candidates exist).
+    """
+    if count == 0:
+        return []
+
+    edges_sql = _build_edges_sql(region_id)
+    max_cost = target_distance_m * 1.2
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT node, agg_cost
+            FROM pgr_drivingDistance(%s, %s, %s, directed := false)
+            WHERE node != %s
+            """,
+            [edges_sql, source_node, max_cost, source_node],
+        )
+        rows = cursor.fetchall()
+
+    if not rows:
+        return []
+
+    tolerance = 0.3
+    waypoints: list[int] = []
+    used_nodes: set[int] = {source_node}
+
+    for i in range(1, count + 1):
+        fraction = i / (count + 1)
+        target_dist = target_distance_m * fraction
+        low = target_dist * (1 - tolerance)
+        high = target_dist * (1 + tolerance)
+
+        candidates = [
+            (node, cost)
+            for node, cost in rows
+            if low <= cost <= high and node not in used_nodes
+        ]
+
+        if not candidates:
+            continue
+
+        chosen = random.choice(candidates)
+        waypoints.append(chosen[0])
+        used_nodes.add(chosen[0])
+
+    return waypoints
+
+
+def _pick_loop_waypoints(
+    region_id: int,
+    source_node: int,
+    target_distance_m: float,
+    count: int,
+) -> list[int]:
+    """Pick waypoints for a loop route sorted by bearing angle.
+
+    Selects waypoints at approximately ``target_distance / (count + 1)``
+    from source, then sorts them by bearing from source to form a
+    coherent circuit.
+
+    Args:
+        region_id: The region to route in.
+        source_node: Starting (and ending) node ID.
+        target_distance_m: Total target loop distance.
+        count: Number of waypoints to pick.
+
+    Returns:
+        List of waypoint node IDs sorted by bearing, or empty list
+        if insufficient candidates exist (triggers fallback).
+    """
+    edges_sql = _build_edges_sql(region_id)
+    wp_distance = target_distance_m / (count + 1)
+    max_cost = wp_distance * 1.5
+    tolerance = 0.3
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT node, agg_cost
+            FROM pgr_drivingDistance(%s, %s, %s, directed := false)
+            WHERE node != %s
+            """,
+            [edges_sql, source_node, max_cost, source_node],
+        )
+        rows = cursor.fetchall()
+
+    if not rows:
+        return []
+
+    low = wp_distance * (1 - tolerance)
+    high = wp_distance * (1 + tolerance)
+    candidates = [(node, cost) for node, cost in rows if low <= cost <= high]
+
+    if len(candidates) < count:
+        return []
+
+    selected = random.sample(candidates, count)
+    wp_nodes = [node for node, _ in selected]
+
+    source_coords = _get_node_coordinates(source_node)
+    bearings: list[tuple[float, int]] = []
+    for node in wp_nodes:
+        coords = _get_node_coordinates(node)
+        bearing = _compute_bearing(
+            source_coords[0], source_coords[1], coords[0], coords[1]
+        )
+        bearings.append((bearing, node))
+
+    bearings.sort()
+    return [node for _, node in bearings]

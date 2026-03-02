@@ -24,7 +24,7 @@ from routes.serializers import (
 from routes.services import (
     RouteGenerationError,
     RouteType,
-    _find_nearest_node_at_distance,
+    _find_random_node_near_place,
     build_gpx_xml,
     build_kml_xml,
     generate_route,
@@ -96,7 +96,7 @@ class RouteGenerateView(APIView):
                 start_place = get_object_or_404(
                     Place, pk=start_place_id, user=request.user, region=region
                 )
-                start_node_override = _find_nearest_node_at_distance(
+                start_node_override = _find_random_node_near_place(
                     region_id, start_place.location.x, start_place.location.y
                 )
             elif start_coords is not None:
@@ -109,7 +109,7 @@ class RouteGenerateView(APIView):
                 end_place = get_object_or_404(
                     Place, pk=end_place_id, user=request.user, region=region
                 )
-                end_node_override = _find_nearest_node_at_distance(
+                end_node_override = _find_random_node_near_place(
                     region_id, end_place.location.x, end_place.location.y
                 )
             elif end_coords is not None and route_type == RouteType.ONE_WAY:
