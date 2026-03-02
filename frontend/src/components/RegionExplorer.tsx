@@ -57,6 +57,9 @@ interface RegionExplorerProps {
   onPlaceDeleted: () => void;
   onCancelPlaceCreation: () => void;
   onExitPlaceCreation: () => void;
+  onToggleShowPlaces: () => void;
+  onToggleCreatingPlace: () => void;
+  onDeletePlace: (placeId: number) => Promise<void>;
 }
 
 export default function RegionExplorer({
@@ -76,6 +79,9 @@ export default function RegionExplorer({
   onPlaceDeleted,
   onCancelPlaceCreation,
   onExitPlaceCreation,
+  onToggleShowPlaces,
+  onToggleCreatingPlace,
+  onDeletePlace,
 }: RegionExplorerProps) {
   const [route, setRoute] = useState<RouteResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -480,6 +486,11 @@ export default function RegionExplorer({
         onPickPointOnMap={handlePickPointOnMap}
         onClearTempPoint={handleClearTempPoint}
         autoSelectPlace={autoSelectPlace}
+        showPlaces={showPlaces}
+        onToggleShowPlaces={onToggleShowPlaces}
+        isCreatingPlace={isCreatingPlace}
+        onToggleCreatingPlace={onToggleCreatingPlace}
+        onDeletePlace={onDeletePlace}
       />
       <PathMap
         region={region}

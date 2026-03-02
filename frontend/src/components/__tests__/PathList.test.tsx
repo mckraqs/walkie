@@ -57,7 +57,7 @@ describe("PathList", () => {
     const onToggleCollapsed = vi.fn();
     render(<PathList {...defaultProps} onToggleCollapsed={onToggleCollapsed} />);
 
-    await user.click(screen.getByText("Path List"));
+    await user.click(screen.getByText("Paths List"));
     expect(onToggleCollapsed).toHaveBeenCalledOnce();
   });
 });

@@ -39,7 +39,7 @@ export default function PathList({
         className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 ${collapsed ? "" : "border-b border-zinc-200 dark:border-zinc-700"}`}
       >
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-          Path List
+          Paths List
         </h3>
         <svg
           xmlns="http://www.w3.org/2000/svg"

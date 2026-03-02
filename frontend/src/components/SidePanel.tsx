@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import SavedRoutes from "@/components/SavedRoutes";
 import RoutePlanner from "@/components/RoutePlanner";
+import Places from "@/components/Places";
 import RouteComposer from "@/components/RouteComposer";
 import PathList from "@/components/PathList";
 import type { TempPoint } from "@/components/RegionExplorer";
@@ -53,18 +54,24 @@ interface SidePanelProps {
   onPickPointOnMap: (which: "start" | "end") => void;
   onClearTempPoint: (which: "start" | "end") => void;
   autoSelectPlace: { which: "start" | "end"; placeId: number } | null;
+  showPlaces: boolean;
+  onToggleShowPlaces: () => void;
+  isCreatingPlace: boolean;
+  onToggleCreatingPlace: () => void;
+  onDeletePlace: (placeId: number) => Promise<void>;
 }
 
 export function computeSectionHeight(
   savedRoutesCollapsed: boolean,
   routePlannerCollapsed: boolean,
+  placesCollapsed: boolean,
   composerCollapsed: boolean,
   pathListCollapsed: boolean,
   isCollapsed: boolean,
 ): string {
-  const sections = [savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed];
+  const sections = [savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed];
   const collapsedCount = sections.filter(Boolean).length;
-  const expandedCount = 4 - collapsedCount;
+  const expandedCount = 5 - collapsedCount;
 
   if (isCollapsed) {
     return HEADER;
@@ -113,9 +120,15 @@ export default function SidePanel({
   onPickPointOnMap,
   onClearTempPoint,
   autoSelectPlace,
+  showPlaces,
+  onToggleShowPlaces,
+  isCreatingPlace,
+  onToggleCreatingPlace,
+  onDeletePlace,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
+  const [placesCollapsed, setPlacesCollapsed] = useState(true);
   const [composerCollapsed, setComposerCollapsed] = useState(true);
   const [pathListCollapsed, setPathListCollapsed] = useState(true);
 
@@ -133,16 +146,19 @@ export default function SidePanel({
   }, [route]);
 
   const savedRoutesHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, savedRoutesCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, savedRoutesCollapsed)
     : "0";
   const rpHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, routePlannerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, routePlannerCollapsed)
+    : "0";
+  const placesHeight = isFavorite
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, placesCollapsed)
     : "0";
   const composerHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, composerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, composerCollapsed)
     : "0";
   const pathListHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, composerCollapsed, pathListCollapsed, pathListCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, pathListCollapsed)
     : "0";
 
   return (
@@ -181,6 +197,17 @@ export default function SidePanel({
             onPickPointOnMap={onPickPointOnMap}
             onClearTempPoint={onClearTempPoint}
             autoSelectPlace={autoSelectPlace}
+          />
+          <Places
+            places={places ?? []}
+            showPlaces={showPlaces}
+            onToggleShowPlaces={onToggleShowPlaces}
+            isCreatingPlace={isCreatingPlace}
+            onToggleCreatingPlace={onToggleCreatingPlace}
+            onDeletePlace={onDeletePlace}
+            collapsed={placesCollapsed}
+            onToggleCollapsed={() => setPlacesCollapsed((c) => !c)}
+            height={placesHeight}
           />
           <RouteComposer
             isFavorite={isFavorite}

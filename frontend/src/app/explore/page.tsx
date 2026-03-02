@@ -12,6 +12,7 @@ import {
   fetchWalkedPaths,
   fetchPlaces,
   fetchSavedRoutes,
+  deletePlace,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import RegionExplorer from "@/components/RegionExplorer";
@@ -157,6 +158,26 @@ export default function ExplorePage() {
     setIsCreatingPlace(false);
     setPendingPlaceLocation(null);
   }, []);
+
+  const handleToggleShowPlaces = useCallback(() => {
+    setShowPlaces((v) => !v);
+  }, []);
+
+  const handleToggleCreatingPlace = useCallback(() => {
+    setIsCreatingPlace((v) => {
+      if (v) setPendingPlaceLocation(null);
+      return !v;
+    });
+  }, []);
+
+  const handleDeletePlace = useCallback(
+    async (placeId: number) => {
+      if (!selectedRegionId) return;
+      await deletePlace(selectedRegionId, placeId);
+      setPlaces((prev) => prev.filter((p) => p.id !== placeId));
+    },
+    [selectedRegionId],
+  );
 
 
   const districts = useMemo(
@@ -355,33 +376,6 @@ export default function ExplorePage() {
                 {walkedCount}/{totalPaths}{" "}
                 ({totalPaths > 0 ? ((walkedCount / totalPaths) * 100).toFixed(1) : "0.0"}%)
               </span>
-              <button
-                type="button"
-                onClick={() => setShowPlaces((v) => !v)}
-                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                  showPlaces
-                    ? "border-purple-600 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-900/30 dark:text-purple-400"
-                    : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                }`}
-              >
-                Places
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreatingPlace((v) => {
-                    if (v) setPendingPlaceLocation(null);
-                    return !v;
-                  });
-                }}
-                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
-                  isCreatingPlace
-                    ? "border-purple-600 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-900/30 dark:text-purple-400"
-                    : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                }`}
-              >
-                {isCreatingPlace ? "Cancel Pin" : "+ Place"}
-              </button>
             </>
           )}
         </div>
@@ -444,6 +438,9 @@ export default function ExplorePage() {
             onPlaceDeleted={handlePlaceDeleted}
             onCancelPlaceCreation={handleCancelPlaceCreation}
             onExitPlaceCreation={handleExitPlaceCreation}
+            onToggleShowPlaces={handleToggleShowPlaces}
+            onToggleCreatingPlace={handleToggleCreatingPlace}
+            onDeletePlace={handleDeletePlace}
           />
         )}
       </div>
