@@ -89,6 +89,7 @@ export default function RegionExplorer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredPathId, setHoveredPathId] = useState<number | null>(null);
+  const [hoveredPlaceId, setHoveredPlaceId] = useState<number | null>(null);
   const [savedRoutes, setSavedRoutes] = useState<RouteListItem[]>([]);
   const [activeRouteId, setActiveRouteId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
@@ -491,6 +492,8 @@ export default function RegionExplorer({
         isCreatingPlace={isCreatingPlace}
         onToggleCreatingPlace={onToggleCreatingPlace}
         onDeletePlace={onDeletePlace}
+        hoveredPlaceId={hoveredPlaceId}
+        onPlaceHover={setHoveredPlaceId}
       />
       <PathMap
         region={region}
@@ -515,6 +518,8 @@ export default function RegionExplorer({
         composedEndPoint={composedEndPoint}
         pickingPoint={pickingPoint}
         onPickPoint={handleMapPickPoint}
+        hoveredPlaceId={hoveredPlaceId}
+        onPlaceHover={setHoveredPlaceId}
         startTempPoint={startTempPoint}
         endTempPoint={endTempPoint}
       />

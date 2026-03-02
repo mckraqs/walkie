@@ -51,6 +51,8 @@ interface PathMapProps {
   onPickPoint?: (coords: [number, number]) => void;
   startTempPoint?: TempPoint | null;
   endTempPoint?: TempPoint | null;
+  hoveredPlaceId?: number | null;
+  onPlaceHover?: (placeId: number | null) => void;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -299,31 +301,63 @@ function ResetViewControl({ region, paths }: { region: RegionFeature; paths: Pat
 
 function PlaceMarkers({
   places,
+  hoveredPlaceId,
+  onPlaceHover,
 }: {
   places: Place[];
+  hoveredPlaceId?: number | null;
+  onPlaceHover?: (placeId: number | null) => void;
 }) {
+  const markerRefs = useRef<Map<number, L.CircleMarker>>(new Map());
+
+  useEffect(() => {
+    markerRefs.current.forEach((marker, id) => {
+      if (id === hoveredPlaceId) {
+        marker.openTooltip();
+      } else {
+        marker.closeTooltip();
+      }
+    });
+  }, [hoveredPlaceId]);
+
   return (
     <>
-      {places.map((place) => (
-        <CircleMarker
-          key={place.id}
-          center={[place.location[1], place.location[0]]}
-          radius={7}
-          pathOptions={{
-            fillColor: "#8b5cf6",
-            color: "#ffffff",
-            weight: 2,
-            fillOpacity: 1,
-          }}
-          eventHandlers={{
-            click: (e) => {
-              L.DomEvent.stopPropagation(e);
-            },
-          }}
-        >
-          <Tooltip>{place.name}</Tooltip>
-        </CircleMarker>
-      ))}
+      {places.map((place) => {
+        const isHovered = hoveredPlaceId === place.id;
+        return (
+          <CircleMarker
+            key={place.id}
+            ref={(el) => {
+              if (el) {
+                markerRefs.current.set(place.id, el);
+              } else {
+                markerRefs.current.delete(place.id);
+              }
+            }}
+            center={[place.location[1], place.location[0]]}
+            radius={isHovered ? 10 : 7}
+            pathOptions={{
+              fillColor: isHovered ? "#a78bfa" : "#8b5cf6",
+              color: "#ffffff",
+              weight: 2,
+              fillOpacity: 1,
+            }}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+              },
+              mouseover: () => {
+                onPlaceHover?.(place.id);
+              },
+              mouseout: () => {
+                onPlaceHover?.(null);
+              },
+            }}
+          >
+            <Tooltip className="!text-sm">{place.name}</Tooltip>
+          </CircleMarker>
+        );
+      })}
     </>
   );
 }
@@ -539,6 +573,8 @@ export default function PathMap({
   onPickPoint,
   startTempPoint,
   endTempPoint,
+  hoveredPlaceId,
+  onPlaceHover,
 }: PathMapProps) {
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
@@ -641,6 +677,8 @@ export default function PathMap({
   showWalkedOnlyRef.current = showWalkedOnly;
   const composingRef = useRef(composing);
   composingRef.current = composing;
+  const showPlacesRef = useRef(showPlaces);
+  showPlacesRef.current = showPlaces;
 
   useEffect(() => {
     // When composerError changes and there's an error, we could flash the last clicked segment
@@ -661,6 +699,7 @@ export default function PathMap({
 
   function getBaseStyle(pathId: number): PathOptions {
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
+    if (showPlacesRef.current) return UNWALKED_DIMMED_STYLE;
     const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
     if (showWalkedOnlyRef.current && walked) return WALKED_HIGHLIGHT_STYLE;
     if (showWalkedOnlyRef.current && !walked) return UNWALKED_DIMMED_STYLE;
@@ -703,7 +742,7 @@ export default function PathMap({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walkedPathIds, hasRoute, showWalkedOnly]);
+  }, [walkedPathIds, hasRoute, showWalkedOnly, showPlaces]);
 
   // External hover drives style (highlight all siblings)
   useEffect(() => {
@@ -776,12 +815,12 @@ export default function PathMap({
           <PointPickingHandler onPickPoint={onPickPoint} />
         )}
         {showPlaces && places && places.length > 0 && (
-          <PlaceMarkers places={places} />
+          <PlaceMarkers places={places} hoveredPlaceId={hoveredPlaceId} onPlaceHover={onPlaceHover} />
         )}
         <TempPointMarkers startTempPoint={startTempPoint} endTempPoint={endTempPoint} />
         {paths.features.length > 0 && (
           <GeoJSON
-            key={`paths-${hasRoute ? "dimmed" : "normal"}`}
+            key={`paths-${hasRoute ? "dimmed" : showPlaces ? "places" : "normal"}`}
             data={paths}
             style={pathStyleFn}
             onEachFeature={(feature, layer: Layer) => {

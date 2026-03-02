@@ -14,6 +14,8 @@ interface PlacesProps {
   isCreatingPlace: boolean;
   onToggleCreatingPlace: () => void;
   onDeletePlace: (placeId: number) => Promise<void>;
+  hoveredPlaceId: number | null;
+  onPlaceHover: (placeId: number | null) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
@@ -26,6 +28,8 @@ export default function Places({
   isCreatingPlace,
   onToggleCreatingPlace,
   onDeletePlace,
+  hoveredPlaceId,
+  onPlaceHover,
   collapsed,
   onToggleCollapsed,
   height,
@@ -82,7 +86,9 @@ export default function Places({
             {places.map((place) => (
               <li
                 key={place.id}
-                className="flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+                className={`flex items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent${hoveredPlaceId === place.id ? " bg-accent" : ""}`}
+                onMouseEnter={() => onPlaceHover(place.id)}
+                onMouseLeave={() => onPlaceHover(null)}
               >
                 <span className="min-w-0 flex-1 truncate text-xs font-medium">
                   {place.name}

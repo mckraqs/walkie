@@ -59,6 +59,8 @@ interface SidePanelProps {
   isCreatingPlace: boolean;
   onToggleCreatingPlace: () => void;
   onDeletePlace: (placeId: number) => Promise<void>;
+  hoveredPlaceId: number | null;
+  onPlaceHover: (placeId: number | null) => void;
 }
 
 export function computeSectionHeight(
@@ -125,6 +127,8 @@ export default function SidePanel({
   isCreatingPlace,
   onToggleCreatingPlace,
   onDeletePlace,
+  hoveredPlaceId,
+  onPlaceHover,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
@@ -205,6 +209,8 @@ export default function SidePanel({
             isCreatingPlace={isCreatingPlace}
             onToggleCreatingPlace={onToggleCreatingPlace}
             onDeletePlace={onDeletePlace}
+            hoveredPlaceId={hoveredPlaceId}
+            onPlaceHover={onPlaceHover}
             collapsed={placesCollapsed}
             onToggleCollapsed={() => setPlacesCollapsed((c) => !c)}
             height={placesHeight}

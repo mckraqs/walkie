@@ -16,6 +16,8 @@ function defaultProps(overrides: Partial<Parameters<typeof Places>[0]> = {}) {
     isCreatingPlace: false,
     onToggleCreatingPlace: vi.fn(),
     onDeletePlace: vi.fn().mockResolvedValue(undefined),
+    hoveredPlaceId: null,
+    onPlaceHover: vi.fn(),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
     height: "300px",
