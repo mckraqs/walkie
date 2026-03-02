@@ -14,6 +14,7 @@ import type {
   SaveRouteRequest,
   Place,
   PathFeature,
+  GeocodingResult,
 } from "@/types/geo";
 
 const HEADER = "2.75rem";
@@ -61,6 +62,12 @@ interface SidePanelProps {
   onDeletePlace: (placeId: number) => Promise<void>;
   hoveredPlaceId: number | null;
   onPlaceHover: (placeId: number | null) => void;
+  regionBbox: [number, number, number, number] | null;
+  regionCenter: [number, number] | null;
+  onSearchResultHover: (location: [number, number] | null) => void;
+  onSearchResultSelect: (result: GeocodingResult) => void;
+  onSaveSearchResult: (name: string, location: [number, number]) => void;
+  onUseAsRoutePoint: (which: "start" | "end", coords: [number, number]) => void;
 }
 
 export function computeSectionHeight(
@@ -129,6 +136,12 @@ export default function SidePanel({
   onDeletePlace,
   hoveredPlaceId,
   onPlaceHover,
+  regionBbox,
+  regionCenter,
+  onSearchResultHover,
+  onSearchResultSelect,
+  onSaveSearchResult,
+  onUseAsRoutePoint,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
@@ -214,6 +227,13 @@ export default function SidePanel({
             collapsed={placesCollapsed}
             onToggleCollapsed={() => setPlacesCollapsed((c) => !c)}
             height={placesHeight}
+            regionBbox={regionBbox}
+            regionCenter={regionCenter}
+            routePlannerActive={!routePlannerCollapsed}
+            onSearchResultHover={onSearchResultHover}
+            onSearchResultSelect={onSearchResultSelect}
+            onSaveSearchResult={onSaveSearchResult}
+            onUseAsRoutePoint={onUseAsRoutePoint}
           />
           <RouteComposer
             isFavorite={isFavorite}

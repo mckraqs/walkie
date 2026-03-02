@@ -53,6 +53,7 @@ interface PathMapProps {
   endTempPoint?: TempPoint | null;
   hoveredPlaceId?: number | null;
   onPlaceHover?: (placeId: number | null) => void;
+  searchHighlight?: [number, number] | null;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -505,6 +506,35 @@ function MeasureLayer({ points }: { points: L.LatLng[] }) {
   );
 }
 
+function SearchHighlightMarker({
+  location,
+}: {
+  location: [number, number];
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.flyTo([location[1], location[0]], Math.max(map.getZoom(), 15), {
+      duration: 0.5,
+    });
+  }, [map, location]);
+
+  return (
+    <CircleMarker
+      center={[location[1], location[0]]}
+      radius={10}
+      pathOptions={{
+        fillColor: "#f59e0b",
+        color: "#ffffff",
+        weight: 2,
+        fillOpacity: 0.9,
+      }}
+    >
+      <Tooltip>Search result</Tooltip>
+    </CircleMarker>
+  );
+}
+
 function TempPointMarkers({
   startTempPoint,
   endTempPoint,
@@ -575,6 +605,7 @@ export default function PathMap({
   endTempPoint,
   hoveredPlaceId,
   onPlaceHover,
+  searchHighlight,
 }: PathMapProps) {
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
@@ -818,6 +849,9 @@ export default function PathMap({
           <PlaceMarkers places={places} hoveredPlaceId={hoveredPlaceId} onPlaceHover={onPlaceHover} />
         )}
         <TempPointMarkers startTempPoint={startTempPoint} endTempPoint={endTempPoint} />
+        {searchHighlight && (
+          <SearchHighlightMarker location={searchHighlight} />
+        )}
         {paths.features.length > 0 && (
           <GeoJSON
             key={`paths-${hasRoute ? "dimmed" : showPlaces ? "places" : "normal"}`}

@@ -133,6 +133,12 @@ export interface PlaceUpdateRequest {
   location?: [number, number];
 }
 
+export interface GeocodingResult {
+  name: string;
+  displayName: string;
+  location: [number, number];
+}
+
 export interface RouteListItem {
   id: number;
   name: string;

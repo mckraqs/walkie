@@ -17,6 +17,7 @@ import type {
   RouteRenameRequest,
   RouteWalkToggleResponse,
   RemoveFavoriteResponse,
+  GeocodingResult,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -375,4 +376,51 @@ export async function toggleRouteWalked(
     throw new Error(`Failed to toggle route walked: ${res.status}`);
   }
   return res.json();
+}
+
+function formatGeocodingDisplayName(props: Record<string, string | undefined>): string {
+  const name = props.name ?? "";
+  const parts: string[] = [];
+  if (props.street) {
+    parts.push(props.housenumber ? `${props.street} ${props.housenumber}` : props.street);
+  }
+  if (props.city) parts.push(props.city);
+  else if (props.county) parts.push(props.county);
+  if (parts.length > 0) {
+    return name ? `${name}, ${parts.join(", ")}` : parts.join(", ");
+  }
+  if (name) return name;
+  if (props.state) return props.state;
+  return "Unknown location";
+}
+
+export async function searchGeocoding(
+  query: string,
+  bbox?: [number, number, number, number] | null,
+  lat?: number | null,
+  lon?: number | null,
+  limit: number = 5,
+): Promise<GeocodingResult[]> {
+  const params = new URLSearchParams({ q: query, limit: String(limit), lang: "en" });
+  if (bbox) {
+    params.set("bbox", bbox.join(","));
+  }
+  if (lat != null && lon != null) {
+    params.set("lat", String(lat));
+    params.set("lon", String(lon));
+  }
+  const res = await fetch(`https://photon.komoot.io/api/?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Geocoding failed: ${res.status}`);
+  }
+  const data: { features?: { geometry: { coordinates: [number, number] }; properties?: Record<string, string | undefined> }[] } = await res.json();
+  return (data.features ?? []).map((f) => {
+    const props = f.properties ?? {};
+    const displayName = formatGeocodingDisplayName(props);
+    return {
+      name: props.name || displayName,
+      displayName,
+      location: f.geometry.coordinates,
+    };
+  });
 }

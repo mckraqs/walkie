@@ -31,6 +31,7 @@ import type {
   Place,
   SegmentFeatureCollection,
   SegmentFeature,
+  GeocodingResult,
 } from "@/types/geo";
 
 export interface TempPoint {
@@ -104,6 +105,32 @@ export default function RegionExplorer({
   const [pendingSavePointLocation, setPendingSavePointLocation] = useState<[number, number] | null>(null);
   const [pendingSavePointTarget, setPendingSavePointTarget] = useState<"start" | "end" | null>(null);
   const [autoSelectPlace, setAutoSelectPlace] = useState<{ which: "start" | "end"; placeId: number } | null>(null);
+
+  // Search state
+  const [searchHighlight, setSearchHighlight] = useState<[number, number] | null>(null);
+  const [pendingPlaceName, setPendingPlaceName] = useState<string | null>(null);
+
+  const regionBbox = useMemo<[number, number, number, number] | null>(() => {
+    if (!region?.geometry) return null;
+    let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+    for (const polygon of region.geometry.coordinates) {
+      for (const ring of polygon) {
+        for (const coord of ring) {
+          const [lon, lat] = coord as [number, number];
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+        }
+      }
+    }
+    return [minLon, minLat, maxLon, maxLat];
+  }, [region]);
+
+  const regionCenter = useMemo<[number, number] | null>(() => {
+    if (!regionBbox) return null;
+    return [(regionBbox[0] + regionBbox[2]) / 2, (regionBbox[1] + regionBbox[3]) / 2];
+  }, [regionBbox]);
 
   useEffect(() => {
     if (!isFavorite) return;
@@ -271,6 +298,29 @@ export default function RegionExplorer({
       setStartTempPoint(null);
     } else {
       setEndTempPoint(null);
+    }
+  }, []);
+
+  // --- Search result handlers ---
+  const handleSearchResultHover = useCallback((location: [number, number] | null) => {
+    setSearchHighlight(location);
+  }, []);
+
+  const handleSearchResultSelect = useCallback((result: GeocodingResult) => {
+    setSearchHighlight(result.location);
+  }, []);
+
+  const handleSaveSearchResult = useCallback((name: string, location: [number, number]) => {
+    setPendingPlaceName(name);
+    onPlaceCreate(location);
+  }, [onPlaceCreate]);
+
+  const handleSearchUseAsRoutePoint = useCallback((which: "start" | "end", coords: [number, number]) => {
+    const tp: TempPoint = { coords };
+    if (which === "start") {
+      setStartTempPoint(tp);
+    } else {
+      setEndTempPoint(tp);
     }
   }, []);
 
@@ -494,6 +544,12 @@ export default function RegionExplorer({
         onDeletePlace={onDeletePlace}
         hoveredPlaceId={hoveredPlaceId}
         onPlaceHover={setHoveredPlaceId}
+        regionBbox={regionBbox}
+        regionCenter={regionCenter}
+        onSearchResultHover={handleSearchResultHover}
+        onSearchResultSelect={handleSearchResultSelect}
+        onSaveSearchResult={handleSaveSearchResult}
+        onUseAsRoutePoint={handleSearchUseAsRoutePoint}
       />
       <PathMap
         region={region}
@@ -522,11 +578,13 @@ export default function RegionExplorer({
         onPlaceHover={setHoveredPlaceId}
         startTempPoint={startTempPoint}
         endTempPoint={endTempPoint}
+        searchHighlight={searchHighlight}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog
           regionId={regionId}
           location={pendingPlaceLocation}
+          initialName={pendingPlaceName ?? undefined}
           onCreated={(place: Place) => {
             // If this was triggered from a "Save as Place" flow, auto-select the place
             if (pendingSavePointTarget) {
@@ -538,10 +596,12 @@ export default function RegionExplorer({
               }
               setPendingSavePointTarget(null);
             }
+            setPendingPlaceName(null);
             onPlaceCreated(place);
           }}
           onCancel={() => {
             setPendingSavePointTarget(null);
+            setPendingPlaceName(null);
             onCancelPlaceCreation();
           }}
         />

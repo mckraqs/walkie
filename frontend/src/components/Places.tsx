@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import CollapsibleSection from "@/components/collapsible-section";
+import PlaceSearch from "@/components/PlaceSearch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import type { Place } from "@/types/geo";
+import type { Place, GeocodingResult } from "@/types/geo";
 
 interface PlacesProps {
   places: Place[];
@@ -19,6 +20,13 @@ interface PlacesProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
+  regionBbox: [number, number, number, number] | null;
+  regionCenter: [number, number] | null;
+  routePlannerActive: boolean;
+  onSearchResultHover: (location: [number, number] | null) => void;
+  onSearchResultSelect: (result: GeocodingResult) => void;
+  onSaveSearchResult: (name: string, location: [number, number]) => void;
+  onUseAsRoutePoint: (which: "start" | "end", coords: [number, number]) => void;
 }
 
 export default function Places({
@@ -33,6 +41,13 @@ export default function Places({
   collapsed,
   onToggleCollapsed,
   height,
+  regionBbox,
+  regionCenter,
+  routePlannerActive,
+  onSearchResultHover,
+  onSearchResultSelect,
+  onSaveSearchResult,
+  onUseAsRoutePoint,
 }: PlacesProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -76,6 +91,16 @@ export default function Places({
             {isCreatingPlace ? "Cancel Pin" : "+ Place"}
           </Button>
         </div>
+
+        <PlaceSearch
+          regionBbox={regionBbox}
+          regionCenter={regionCenter}
+          routePlannerActive={routePlannerActive}
+          onResultHover={onSearchResultHover}
+          onResultSelect={onSearchResultSelect}
+          onSaveResult={onSaveSearchResult}
+          onUseAsRoutePoint={onUseAsRoutePoint}
+        />
 
         {places.length === 0 ? (
           <p className="text-xs text-muted-foreground">

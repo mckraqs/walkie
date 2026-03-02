@@ -12,6 +12,7 @@ interface PlaceNameDialogProps {
   location: [number, number];
   onCreated: (place: Place) => void;
   onCancel: () => void;
+  initialName?: string;
 }
 
 export default function PlaceNameDialog({
@@ -19,8 +20,9 @@ export default function PlaceNameDialog({
   location,
   onCreated,
   onCancel,
+  initialName,
 }: PlaceNameDialogProps) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
