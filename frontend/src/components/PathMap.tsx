@@ -6,6 +6,7 @@ import {
   TileLayer,
   GeoJSON,
   CircleMarker,
+  Polyline,
   Tooltip,
   useMap,
   useMapEvents,
@@ -353,6 +354,123 @@ function PointPickingHandler({
   return null;
 }
 
+function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(2)} km`;
+}
+
+function MeasureControl({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const control = new L.Control({ position: "topleft" });
+
+    control.onAdd = () => {
+      const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+      const button = L.DomUtil.create("a", "", container);
+      button.innerHTML = "&#128207;";
+      button.title = "Measure distance";
+      button.href = "#";
+      button.role = "button";
+      button.setAttribute("aria-label", "Measure distance");
+      Object.assign(button.style, {
+        fontSize: "16px",
+        lineHeight: "26px",
+        textAlign: "center",
+        textDecoration: "none",
+        cursor: "pointer",
+        width: "30px",
+        height: "30px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: active ? "#f59e0b" : "",
+        color: active ? "#ffffff" : "",
+      });
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.on(button, "click", (e) => {
+        L.DomEvent.preventDefault(e);
+        onToggle();
+      });
+
+      return container;
+    };
+
+    control.addTo(map);
+    return () => {
+      control.remove();
+    };
+  }, [map, active, onToggle]);
+
+  return null;
+}
+
+function MeasureClickHandler({
+  onAdd,
+}: {
+  onAdd: (latlng: L.LatLng) => void;
+}) {
+  useMapEvents({
+    click: (e) => {
+      onAdd(e.latlng);
+    },
+  });
+  return null;
+}
+
+function MeasureLayer({ points }: { points: L.LatLng[] }) {
+  const positions = points.map((p): [number, number] => [p.lat, p.lng]);
+  return (
+    <>
+      <Polyline
+        positions={positions}
+        pathOptions={{
+          color: "#f59e0b",
+          weight: 3,
+          dashArray: "8 8",
+          opacity: 0.9,
+        }}
+      />
+      {points.map((p, i) => (
+        <CircleMarker
+          key={i}
+          center={[p.lat, p.lng]}
+          radius={5}
+          pathOptions={{
+            fillColor: "#f59e0b",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 1,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 function TempPointMarkers({
   startTempPoint,
   endTempPoint,
@@ -422,6 +540,26 @@ export default function PathMap({
   startTempPoint,
   endTempPoint,
 }: PathMapProps) {
+  const [measureActive, setMeasureActive] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
+
+  const toggleMeasure = useCallback(() => {
+    setMeasureActive((prev) => {
+      if (prev) setMeasurePoints([]);
+      return !prev;
+    });
+  }, []);
+
+  const measureTotal = useMemo(() => {
+    let total = 0;
+    for (let i = 1; i < measurePoints.length; i++) {
+      const a = measurePoints[i - 1];
+      const b = measurePoints[i];
+      total += haversineDistance(a.lat, a.lng, b.lat, b.lng);
+    }
+    return total;
+  }, [measurePoints]);
+
   const hasRoute = composing || (route && route.segments.features.length > 0);
   const totalSegments = hasRoute && route ? route.segments.features.length : 0;
   const layerMapRef = useRef<Map<number, L.Path>>(new Map());
@@ -609,7 +747,7 @@ export default function PathMap({
   );
 
   return (
-    <div className={`relative h-full w-full${isCreatingPlace || pickingPoint ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
+    <div className={`relative h-full w-full${isCreatingPlace || pickingPoint || measureActive ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
       <MapContainer
         center={[51.4, 21.1]}
         zoom={12}
@@ -622,6 +760,15 @@ export default function PathMap({
         <FitBounds region={region} paths={paths} route={route} />
         <MapRefSetter />
         <ResetViewControl region={region} paths={paths} />
+        <MeasureControl active={measureActive} onToggle={toggleMeasure} />
+        {measureActive && !isCreatingPlace && !pickingPoint && (
+          <MeasureClickHandler
+            onAdd={(latlng) => setMeasurePoints((prev) => [...prev, latlng])}
+          />
+        )}
+        {measureActive && measurePoints.length > 0 && (
+          <MeasureLayer points={measurePoints} />
+        )}
         {isCreatingPlace && (
           <PlaceCreationHandler onPlaceCreate={onPlaceCreate!} />
         )}
@@ -832,6 +979,42 @@ export default function PathMap({
           </div>
           <div className="text-zinc-600 dark:text-zinc-400">
             Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
+          </div>
+        </div>
+      )}
+      {measureActive && (
+        <div
+          className="absolute z-[1001] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+          style={{ left: 50, top: 10 }}
+        >
+          <div className="mb-2 font-semibold text-zinc-900 dark:text-zinc-100">
+            {formatDistance(measureTotal)}
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+              onClick={() =>
+                setMeasurePoints((prev) => prev.slice(0, -1))
+              }
+              disabled={measurePoints.length === 0}
+            >
+              Undo
+            </button>
+            <button
+              className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+              onClick={() => setMeasurePoints([])}
+            >
+              Clear
+            </button>
+            <button
+              className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+              onClick={() => {
+                setMeasureActive(false);
+                setMeasurePoints([]);
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
