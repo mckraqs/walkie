@@ -16,7 +16,7 @@ describe("PathList", () => {
     onPathHover: vi.fn(),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
-    maxHeight: "300px",
+    height: "300px",
   };
 
   it("renders all paths", () => {

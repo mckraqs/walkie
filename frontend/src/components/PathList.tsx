@@ -1,5 +1,7 @@
 "use client";
 
+import CollapsibleSection from "@/components/collapsible-section";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { PathFeature } from "@/types/geo";
 
 interface PathListProps {
@@ -11,7 +13,7 @@ interface PathListProps {
 
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  maxHeight: number | string;
+  height: number | string;
 }
 
 export default function PathList({
@@ -22,7 +24,7 @@ export default function PathList({
   onPathHover,
   collapsed,
   onToggleCollapsed,
-  maxHeight,
+  height,
 }: PathListProps) {
   const visiblePaths = showWalkedOnly
     ? paths.filter((p) => walkedPathIds.has(p.id))
@@ -36,34 +38,15 @@ export default function PathList({
   });
 
   return (
-    <div
-      className="flex flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg transition-all duration-300 ease-in-out dark:border-zinc-700 dark:bg-zinc-900"
-      style={{ height: maxHeight }}
+    <CollapsibleSection
+      title="Paths List"
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
+      height={height}
     >
-      <button
-        type="button"
-        onClick={onToggleCollapsed}
-        className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 ${collapsed ? "" : "border-b border-zinc-200 dark:border-zinc-700"}`}
-      >
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-          Paths List
-        </h3>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`h-4 w-4 text-zinc-500 transition-transform duration-300 dark:text-zinc-400 ${collapsed ? "rotate-180" : ""}`}
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-      <div className="flex-1 overflow-y-auto p-4">
+      <ScrollArea className="h-full p-4">
         {deduplicatedPaths.length === 0 ? (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-xs text-muted-foreground">
             No paths to display.
           </p>
         ) : (
@@ -77,7 +60,7 @@ export default function PathList({
                   key={path.id}
                   className={`flex items-center justify-between rounded px-2 py-1.5 text-sm transition-colors ${
                     isHovered
-                      ? "bg-zinc-100 dark:bg-zinc-800"
+                      ? "bg-accent"
                       : ""
                   }`}
                   onMouseEnter={() => onPathHover(path.id)}
@@ -90,10 +73,10 @@ export default function PathList({
                         title="Walked"
                       />
                     )}
-                    <span className="truncate font-medium text-zinc-900 dark:text-zinc-50">
+                    <span className="truncate font-medium">
                       {path.properties.name || "Unnamed"}
                     </span>
-                    <span className="flex-shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                    <span className="flex-shrink-0 text-xs text-muted-foreground">
                       {path.properties.category}
                     </span>
                   </div>
@@ -102,7 +85,7 @@ export default function PathList({
             })}
           </ul>
         )}
-      </div>
-    </div>
+      </ScrollArea>
+    </CollapsibleSection>
   );
 }

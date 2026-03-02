@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Star } from "lucide-react";
 
 import {
   fetchRegions,
@@ -17,12 +18,27 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import RegionExplorer from "@/components/RegionExplorer";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   RegionListItem,
   RegionFeature,
   PathFeatureCollection,
   Place,
 } from "@/types/geo";
+
+const NO_DISTRICT = "__all__";
+const NO_REGION = "__none__";
 
 export default function ExplorePage() {
   const router = useRouter();
@@ -91,7 +107,6 @@ export default function ExplorePage() {
 
   useEffect(() => {
     if (!selectedRegionId || !user || !isFavorite) {
-      // Reset via resolved promise to satisfy set-state-in-effect lint rule
       Promise.resolve().then(() => {
         setWalkedPathIds([]);
         setTotalPaths(0);
@@ -206,7 +221,11 @@ export default function ExplorePage() {
   }, [regions, selectedLvl1, selectedRegionId]);
 
   function handleLvl1Change(value: string) {
-    setSelectedLvl1(value);
+    setSelectedLvl1(value === NO_DISTRICT ? "" : value);
+  }
+
+  function handleRegionChange(value: string) {
+    setSelectedRegionId(value === NO_REGION ? "" : value);
   }
 
   function buildUnfavoriteMessage(routeCount: number, placeCount: number): string {
@@ -293,130 +312,142 @@ export default function ExplorePage() {
 
   if (authLoading || (!user && !error)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
+      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
-          <select
-            value={selectedLvl1}
-            onChange={(e) => handleLvl1Change(e.target.value)}
-            className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          <Select
+            value={selectedLvl1 || NO_DISTRICT}
+            onValueChange={handleLvl1Change}
           >
-            <option value="">All districts</option>
-            {districts.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedRegionId}
-            onChange={(e) => setSelectedRegionId(e.target.value)}
-            className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            <SelectTrigger className="h-9 w-auto min-w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_DISTRICT}>All districts</SelectItem>
+              {districts.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedRegionId || NO_REGION}
+            onValueChange={handleRegionChange}
           >
-            {!selectedRegionId && <option value="">Select a region...</option>}
-            {filteredRegions.currentlySelected.length > 0 && (
-              <optgroup label="Currently selected">
-                {filteredRegions.currentlySelected.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {filteredRegions.favorites.length > 0 && (
-              <optgroup label="Favorites">
-                {filteredRegions.favorites.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {filteredRegions.others.length > 0 && (
-              <optgroup label="Other regions">
-                {filteredRegions.others.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+            <SelectTrigger className="h-9 w-auto min-w-[180px]">
+              <SelectValue placeholder="Select a region..." />
+            </SelectTrigger>
+            <SelectContent>
+              {!selectedRegionId && (
+                <SelectItem value={NO_REGION}>Select a region...</SelectItem>
+              )}
+              {filteredRegions.currentlySelected.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>Currently selected</SelectLabel>
+                  {filteredRegions.currentlySelected.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {filteredRegions.favorites.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>Favorites</SelectLabel>
+                  {filteredRegions.favorites.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {filteredRegions.others.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>Other regions</SelectLabel>
+                  {filteredRegions.others.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+            </SelectContent>
+          </Select>
           {selectedRegionId && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={toggleFavorite}
-              className="text-xl text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+              className="h-8 w-8"
               title={isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
-              {isFavorite ? "\u2605" : "\u2606"}
-            </button>
+              <Star className={`h-5 w-5 ${isFavorite ? "fill-current text-yellow-500" : "text-muted-foreground"}`} />
+            </Button>
           )}
           {selectedRegionId && isFavorite && (
             <>
-              <button
-                type="button"
+              <Button
+                variant={showWalkedOnly ? "default" : "outline"}
+                size="sm"
                 onClick={() => setShowWalkedOnly((v) => !v)}
-                className={`rounded-lg border px-3 py-1 text-sm font-medium ${
+                className={
                   showWalkedOnly
-                    ? "border-green-600 bg-green-50 text-green-700 dark:border-green-500 dark:bg-green-900/30 dark:text-green-400"
-                    : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                }`}
+                    ? "border-green-600 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-500 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                    : ""
+                }
               >
                 Walked
-              </button>
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+              </Button>
+              <Badge variant="secondary">
                 {walkedCount}/{totalPaths}{" "}
                 ({totalPaths > 0 ? ((walkedCount / totalPaths) * 100).toFixed(1) : "0.0"}%)
-              </span>
+              </Badge>
             </>
           )}
         </div>
         <div className="flex items-center gap-3">
           {user && (
             <>
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">
+              <span className="text-sm text-muted-foreground">
                 {user.username}
               </span>
-              <button
-                type="button"
-                onClick={logout}
-                className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-              >
+              <Button variant="ghost" size="sm" onClick={logout}>
                 Logout
-              </button>
+              </Button>
             </>
           )}
+          <ThemeToggle />
         </div>
       </header>
       <div className="flex-1">
         {regionsLoading && (
-          <div className="flex h-full items-center justify-center bg-zinc-50 dark:bg-black">
-            <p className="text-zinc-500 dark:text-zinc-400">Loading regions...</p>
+          <div className="flex h-full items-center justify-center bg-background">
+            <p className="text-muted-foreground">Loading regions...</p>
           </div>
         )}
         {error && (
-          <div className="flex h-full items-center justify-center bg-zinc-50 dark:bg-black">
-            <p className="text-lg text-red-600 dark:text-red-400">{error}</p>
+          <div className="flex h-full items-center justify-center bg-background">
+            <p className="text-lg text-destructive">{error}</p>
           </div>
         )}
         {!regionsLoading && !error && !selectedRegionId && (
-          <div className="flex h-full items-center justify-center bg-zinc-50 dark:bg-black">
-            <p className="text-lg text-zinc-500 dark:text-zinc-400">
+          <div className="flex h-full items-center justify-center bg-background">
+            <p className="text-lg text-muted-foreground">
               Select a region to explore
             </p>
           </div>
         )}
         {regionLoading && (
-          <div className="flex h-full items-center justify-center bg-zinc-50 dark:bg-black">
-            <p className="text-zinc-500 dark:text-zinc-400">Loading region...</p>
+          <div className="flex h-full items-center justify-center bg-background">
+            <p className="text-muted-foreground">Loading region...</p>
           </div>
         )}
         {!regionLoading && region && paths && selectedRegionId && (

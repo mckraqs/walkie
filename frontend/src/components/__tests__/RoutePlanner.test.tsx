@@ -45,14 +45,14 @@ describe("RoutePlanner", () => {
     const user = userEvent.setup();
     render(<RoutePlanner {...defaultProps} />);
 
-    // Initially end-place should be visible (one_way by default)
-    expect(screen.getByLabelText("Finish place")).toBeInTheDocument();
+    // Initially "Finish place" label should be visible (one_way by default)
+    expect(screen.getByText("Finish place")).toBeInTheDocument();
 
     // Toggle to loop
-    await user.click(screen.getByLabelText("Loop route"));
+    await user.click(screen.getByText("Loop route"));
 
-    expect(screen.queryByLabelText("Finish place")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Start / Finish place")).toBeInTheDocument();
+    expect(screen.queryByText("Finish place")).not.toBeInTheDocument();
+    expect(screen.getByText("Start / Finish place")).toBeInTheDocument();
   });
 
   it("calls onGenerate with correct args on submit", async () => {

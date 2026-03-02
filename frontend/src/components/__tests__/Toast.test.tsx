@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { ToastProvider, useToast } from "@/contexts/ToastContext";
+
+vi.mock("sonner", () => ({
+  toast: vi.fn(),
+}));
 
 function ToastTrigger({ message }: { message: string }) {
   const { showToast } = useToast();
@@ -8,11 +12,9 @@ function ToastTrigger({ message }: { message: string }) {
 }
 
 describe("ToastProvider", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  it("calls sonner toast when showToast is called", async () => {
+    const { toast } = await import("sonner");
 
-  it("renders a toast message when showToast is called", async () => {
     render(
       <ToastProvider>
         <ToastTrigger message="Hello toast" />
@@ -23,28 +25,6 @@ describe("ToastProvider", () => {
       screen.getByText("Show").click();
     });
 
-    expect(screen.getByRole("status")).toHaveTextContent("Hello toast");
-  });
-
-  it("auto-dismisses the toast after 5 seconds", async () => {
-    vi.useFakeTimers();
-
-    render(
-      <ToastProvider>
-        <ToastTrigger message="Bye toast" />
-      </ToastProvider>,
-    );
-
-    await act(async () => {
-      screen.getByText("Show").click();
-    });
-
-    expect(screen.getByRole("status")).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(5000);
-    });
-
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(toast).toHaveBeenCalledWith("Hello toast");
   });
 });

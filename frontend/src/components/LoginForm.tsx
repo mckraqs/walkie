@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function LoginForm() {
   const { login } = useAuth();
@@ -25,32 +27,28 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3">
-      <input
+      <Input
         type="text"
         placeholder="Username"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         required
-        className="h-12 w-full rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+        className="h-12"
       />
-      <input
+      <Input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
-        className="h-12 w-full rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+        className="h-12"
       />
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       )}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="h-12 rounded-lg bg-zinc-900 px-6 font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-      >
+      <Button type="submit" disabled={submitting} className="h-12">
         {submitting ? "Logging in..." : "Log in"}
-      </button>
+      </Button>
     </form>
   );
 }

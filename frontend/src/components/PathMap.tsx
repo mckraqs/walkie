@@ -962,37 +962,37 @@ export default function PathMap({
       {tooltipData && (
         <div
           ref={tooltipElRef}
-          className="pointer-events-none absolute z-[1001] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+          className="pointer-events-none absolute z-[1001] rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg"
           style={{
             left: tooltipPosRef.current.x,
             top: tooltipPosRef.current.y,
           }}
         >
-          <strong className="text-zinc-900 dark:text-zinc-100">
+          <strong className="text-card-foreground">
             {tooltipData.props.name || "Unnamed"}
           </strong>
-          <div className="text-zinc-600 dark:text-zinc-400">
+          <div className="text-muted-foreground">
             Category: {tooltipData.props.category}
           </div>
-          <div className="text-zinc-600 dark:text-zinc-400">
+          <div className="text-muted-foreground">
             Surface: {tooltipData.props.surface || "unknown"}
           </div>
-          <div className="text-zinc-600 dark:text-zinc-400">
+          <div className="text-muted-foreground">
             Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
           </div>
         </div>
       )}
       {measureActive && (
         <div
-          className="absolute z-[1001] rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+          className="absolute z-[1001] rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg"
           style={{ left: 50, top: 10 }}
         >
-          <div className="mb-2 font-semibold text-zinc-900 dark:text-zinc-100">
+          <div className="mb-2 font-semibold text-card-foreground">
             {formatDistance(measureTotal)}
           </div>
           <div className="flex gap-2">
             <button
-              className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+              className="rounded bg-secondary px-2 py-1 text-xs text-secondary-foreground hover:bg-secondary/80"
               onClick={() =>
                 setMeasurePoints((prev) => prev.slice(0, -1))
               }
@@ -1001,13 +1001,13 @@ export default function PathMap({
               Undo
             </button>
             <button
-              className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+              className="rounded bg-secondary px-2 py-1 text-xs text-secondary-foreground hover:bg-secondary/80"
               onClick={() => setMeasurePoints([])}
             >
               Clear
             </button>
             <button
-              className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+              className="rounded bg-secondary px-2 py-1 text-xs text-secondary-foreground hover:bg-secondary/80"
               onClick={() => {
                 setMeasureActive(false);
                 setMeasurePoints([]);

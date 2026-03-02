@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/AuthContext";
 import LoginForm from "@/components/LoginForm";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const router = useRouter();
@@ -11,20 +12,20 @@ export default function Home() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-        <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-background font-sans">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-background font-sans">
         <main className="flex w-full max-w-md flex-col items-center gap-8 px-6">
-          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-4xl font-bold tracking-tight">
             Walkie
           </h1>
-          <p className="text-center text-lg text-zinc-600 dark:text-zinc-400">
+          <p className="text-center text-lg text-muted-foreground">
             Explore paths and streets within a region.
           </p>
           <LoginForm />
@@ -34,35 +35,30 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-background font-sans">
       <main className="flex w-full max-w-md flex-col items-center gap-8 px-6">
         <div className="flex w-full items-center justify-between">
-          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-4xl font-bold tracking-tight">
             Walkie
           </h1>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            <span className="text-sm text-muted-foreground">
               {user.username}
             </span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-            >
+            <Button variant="ghost" size="sm" onClick={logout}>
               Logout
-            </button>
+            </Button>
           </div>
         </div>
-        <p className="text-center text-lg text-zinc-600 dark:text-zinc-400">
+        <p className="text-center text-lg text-muted-foreground">
           Explore paths and streets within a region.
         </p>
-        <button
-          type="button"
+        <Button
+          className="h-12 px-6"
           onClick={() => router.push("/explore")}
-          className="h-12 rounded-lg bg-zinc-900 px-6 font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
         >
           Browse regions
-        </button>
+        </Button>
       </main>
     </div>
   );

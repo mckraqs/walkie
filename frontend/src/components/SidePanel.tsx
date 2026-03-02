@@ -231,10 +231,9 @@ export default function SidePanel({
             showWalkedOnly={showWalkedOnly}
             hoveredPathId={hoveredPathId}
             onPathHover={onPathHover}
-
             collapsed={pathListCollapsed}
             onToggleCollapsed={() => setPathListCollapsed((c) => !c)}
-            maxHeight={pathListHeight}
+            height={pathListHeight}
           />
         </>
       )}

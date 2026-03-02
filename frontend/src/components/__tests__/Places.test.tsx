@@ -49,7 +49,8 @@ describe("Places", () => {
   it("renders show-on-map checkbox", () => {
     render(<Places {...defaultProps({ showPlaces: true })} />);
     const checkbox = screen.getByRole("checkbox");
-    expect(checkbox).toBeChecked();
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).toHaveAttribute("data-state", "checked");
   });
 
   it("calls onToggleShowPlaces when checkbox is toggled", () => {
