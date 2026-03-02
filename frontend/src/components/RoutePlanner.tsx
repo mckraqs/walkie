@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { downloadRouteFile } from "@/lib/gpx";
+import { formatDistance } from "@/lib/geo";
 import type { TempPoint } from "@/components/RegionExplorer";
 import type {
   RouteResponse,
@@ -28,13 +29,6 @@ interface RoutePlannerProps {
   onPickPointOnMap: (which: "start" | "end") => void;
   onClearTempPoint: (which: "start" | "end") => void;
   autoSelectPlace: { which: "start" | "end"; placeId: number } | null;
-}
-
-function formatDistance(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(1)} km`;
-  }
-  return `${Math.round(meters)} m`;
 }
 
 export default function RoutePlanner({

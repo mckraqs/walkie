@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatDistance } from "@/lib/geo";
 import type { SaveRouteRequest } from "@/types/geo";
 
 interface RouteComposerProps {
@@ -18,13 +19,6 @@ interface RouteComposerProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
-}
-
-function formatDistance(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(1)} km`;
-  }
-  return `${Math.round(meters)} m`;
 }
 
 export default function RouteComposer({

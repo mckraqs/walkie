@@ -55,7 +55,7 @@ interface SidePanelProps {
   autoSelectPlace: { which: "start" | "end"; placeId: number } | null;
 }
 
-function computeSectionHeight(
+export function computeSectionHeight(
   savedRoutesCollapsed: boolean,
   routePlannerCollapsed: boolean,
   composerCollapsed: boolean,

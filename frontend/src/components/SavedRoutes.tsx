@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { downloadRouteFile } from "@/lib/gpx";
+import { formatDistance } from "@/lib/geo";
 import type { RouteListItem, RouteResponse } from "@/types/geo";
 
 interface SavedRoutesProps {
@@ -17,13 +18,6 @@ interface SavedRoutesProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
-}
-
-function formatDistance(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(1)} km`;
-  }
-  return `${Math.round(meters)} m`;
 }
 
 export default function SavedRoutes({
