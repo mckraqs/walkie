@@ -77,7 +77,7 @@ export default function SavedRoutes({
 
   return (
     <CollapsibleSection
-      title="Saved Routes"
+      title="My Routes"
       badge={
         savedRoutes.length > 0
           ? `(${savedRoutes.filter((r) => r.walked).length}/${savedRoutes.length} walked)`

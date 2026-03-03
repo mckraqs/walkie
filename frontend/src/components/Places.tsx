@@ -62,7 +62,7 @@ export default function Places({
 
   return (
     <CollapsibleSection
-      title="Places"
+      title="My Places"
       badge={places.length > 0 ? `(${places.length})` : undefined}
       collapsed={collapsed}
       onToggleCollapsed={onToggleCollapsed}

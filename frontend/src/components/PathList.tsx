@@ -39,7 +39,7 @@ export default function PathList({
 
   return (
     <CollapsibleSection
-      title="Paths List"
+      title="Region Paths"
       collapsed={collapsed}
       onToggleCollapsed={onToggleCollapsed}
       height={height}

@@ -144,9 +144,9 @@ export default function SidePanel({
   onUseAsRoutePoint,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
-  const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
+  const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(true);
   const [placesCollapsed, setPlacesCollapsed] = useState(true);
-  const [composerCollapsed, setComposerCollapsed] = useState(true);
+  const [composerCollapsed, setComposerCollapsed] = useState(false);
   const [pathListCollapsed, setPathListCollapsed] = useState(true);
 
   useEffect(() => {
@@ -182,39 +182,6 @@ export default function SidePanel({
     <div className="absolute right-4 top-4 z-[1000] flex w-72 flex-col gap-2">
       {isFavorite && (
         <>
-          <SavedRoutes
-            savedRoutes={savedRoutes}
-            activeRouteId={activeRouteId}
-            loadedRouteDetails={activeRouteId !== null ? route : null}
-            loading={loading}
-            onLoadRoute={onLoadRoute}
-            onDeleteRoute={onDeleteRoute}
-            onRenameRoute={onRenameRoute}
-            onToggleWalked={onToggleRouteWalked}
-            onClearLoadedRoute={onClearLoadedRoute}
-            collapsed={savedRoutesCollapsed}
-            onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
-            height={savedRoutesHeight}
-          />
-          <RoutePlanner
-            route={route}
-            loading={loading}
-            error={error}
-            onGenerate={onGenerate}
-            onClear={onClear}
-            isFavorite={isFavorite}
-            places={places}
-            onSaveRoute={onSaveRoute}
-            activeRouteId={activeRouteId}
-            collapsed={routePlannerCollapsed}
-            onToggleCollapsed={() => setRoutePlannerCollapsed((c) => !c)}
-            height={rpHeight}
-            startTempPoint={startTempPoint}
-            endTempPoint={endTempPoint}
-            onPickPointOnMap={onPickPointOnMap}
-            onClearTempPoint={onClearTempPoint}
-            autoSelectPlace={autoSelectPlace}
-          />
           <Places
             places={places ?? []}
             showPlaces={showPlaces}
@@ -235,6 +202,20 @@ export default function SidePanel({
             onSaveSearchResult={onSaveSearchResult}
             onUseAsRoutePoint={onUseAsRoutePoint}
           />
+          <SavedRoutes
+            savedRoutes={savedRoutes}
+            activeRouteId={activeRouteId}
+            loadedRouteDetails={activeRouteId !== null ? route : null}
+            loading={loading}
+            onLoadRoute={onLoadRoute}
+            onDeleteRoute={onDeleteRoute}
+            onRenameRoute={onRenameRoute}
+            onToggleWalked={onToggleRouteWalked}
+            onClearLoadedRoute={onClearLoadedRoute}
+            collapsed={savedRoutesCollapsed}
+            onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
+            height={savedRoutesHeight}
+          />
           <RouteComposer
             isFavorite={isFavorite}
             composing={composing}
@@ -250,6 +231,25 @@ export default function SidePanel({
             collapsed={composerCollapsed}
             onToggleCollapsed={() => setComposerCollapsed((c) => !c)}
             height={composerHeight}
+          />
+          <RoutePlanner
+            route={route}
+            loading={loading}
+            error={error}
+            onGenerate={onGenerate}
+            onClear={onClear}
+            isFavorite={isFavorite}
+            places={places}
+            onSaveRoute={onSaveRoute}
+            activeRouteId={activeRouteId}
+            collapsed={routePlannerCollapsed}
+            onToggleCollapsed={() => setRoutePlannerCollapsed((c) => !c)}
+            height={rpHeight}
+            startTempPoint={startTempPoint}
+            endTempPoint={endTempPoint}
+            onPickPointOnMap={onPickPointOnMap}
+            onClearTempPoint={onClearTempPoint}
+            autoSelectPlace={autoSelectPlace}
           />
           <PathList
             paths={paths}
