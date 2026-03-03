@@ -142,7 +142,7 @@ export default function SidePanel({
   onSaveSearchResult,
 }: SidePanelProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
+  const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(true);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(true);
   const [placesCollapsed, setPlacesCollapsed] = useState(true);
   const [pathListCollapsed, setPathListCollapsed] = useState(true);
