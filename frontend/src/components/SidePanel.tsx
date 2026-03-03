@@ -6,6 +6,8 @@ import RoutePlanner from "@/components/RoutePlanner";
 import Places from "@/components/Places";
 import RouteComposer from "@/components/RouteComposer";
 import PathList from "@/components/PathList";
+import { Button } from "@/components/ui/button";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { TempPoint } from "@/components/RegionExplorer";
 import type {
   RouteResponse,
@@ -141,6 +143,7 @@ export default function SidePanel({
   onSearchResultSelect,
   onSaveSearchResult,
 }: SidePanelProps) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(true);
   const [placesCollapsed, setPlacesCollapsed] = useState(true);
@@ -177,88 +180,108 @@ export default function SidePanel({
     : "0";
 
   return (
-    <div className="absolute right-4 top-4 z-[1000] flex w-80 flex-col gap-2">
-      {isFavorite && (
-        <>
-          <Places
-            places={places ?? []}
-            placeCreationMode={placeCreationMode}
-            onSetPlaceCreationMode={onSetPlaceCreationMode}
-            onDeletePlace={onDeletePlace}
-            onRenamePlace={onRenamePlace}
-            onPlaceClick={onPlaceClick}
-            hoveredPlaceId={hoveredPlaceId}
-            onPlaceHover={onPlaceHover}
-            collapsed={placesCollapsed}
-            onToggleCollapsed={() => setPlacesCollapsed((c) => !c)}
-            height={placesHeight}
-            regionBbox={regionBbox}
-            regionCenter={regionCenter}
-            onSearchResultHover={onSearchResultHover}
-            onSearchResultSelect={onSearchResultSelect}
-            onSaveSearchResult={onSaveSearchResult}
-          />
-          <SavedRoutes
-            savedRoutes={savedRoutes}
-            activeRouteId={activeRouteId}
-            loadedRouteDetails={activeRouteId !== null ? route : null}
-            loading={loading}
-            onLoadRoute={onLoadRoute}
-            onDeleteRoute={onDeleteRoute}
-            onRenameRoute={onRenameRoute}
-            onToggleWalked={onToggleRouteWalked}
-            onClearLoadedRoute={onClearLoadedRoute}
-            collapsed={savedRoutesCollapsed}
-            onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
-            height={savedRoutesHeight}
-          />
-          <RouteComposer
-            isFavorite={isFavorite}
-            composing={composing}
-            onStartComposing={onStartComposing}
-            onStopComposing={onStopComposing}
-            selectedSegmentCount={selectedSegmentCount}
-            composedTotalDistance={composedTotalDistance}
-            composedIsLoop={composedIsLoop}
-            onUndoLast={onUndoLastSegment}
-            onClearAll={onClearAllSegments}
-            onSaveRoute={onSaveComposedRoute}
-            composerError={composerError}
-            collapsed={composerCollapsed}
-            onToggleCollapsed={() => setComposerCollapsed((c) => !c)}
-            height={composerHeight}
-          />
-          <RoutePlanner
-            route={route}
-            loading={loading}
-            error={error}
-            onGenerate={onGenerate}
-            onClear={onClear}
-            isFavorite={isFavorite}
-            places={places}
-            onSaveRoute={onSaveRoute}
-            activeRouteId={activeRouteId}
-            collapsed={routePlannerCollapsed}
-            onToggleCollapsed={() => setRoutePlannerCollapsed((c) => !c)}
-            height={rpHeight}
-            startTempPoint={startTempPoint}
-            endTempPoint={endTempPoint}
-            onPickPointOnMap={onPickPointOnMap}
-            onClearTempPoint={onClearTempPoint}
-            autoSelectPlace={autoSelectPlace}
-          />
-          <PathList
-            paths={paths}
-            walkedPathIds={walkedPathIds}
-            hoveredPathId={hoveredPathId}
-            onPathHover={onPathHover}
-            onPathClick={onPathClick}
-            collapsed={pathListCollapsed}
-            onToggleCollapsed={() => setPathListCollapsed((c) => !c)}
-            height={pathListHeight}
-          />
-        </>
-      )}
+    <div className="absolute right-4 top-4 z-[1000] flex items-start">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => setSidebarCollapsed((c) => !c)}
+        className="mt-1 shrink-0 dark:!bg-card dark:hover:!bg-accent"
+      >
+        {sidebarCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
+      </Button>
+
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{
+          width: sidebarCollapsed ? 0 : "20rem",
+          marginLeft: sidebarCollapsed ? 0 : "0.5rem",
+          opacity: sidebarCollapsed ? 0 : 1,
+        }}
+      >
+        <div className="flex w-80 flex-col gap-2">
+          {isFavorite && (
+            <>
+              <Places
+                places={places ?? []}
+                placeCreationMode={placeCreationMode}
+                onSetPlaceCreationMode={onSetPlaceCreationMode}
+                onDeletePlace={onDeletePlace}
+                onRenamePlace={onRenamePlace}
+                onPlaceClick={onPlaceClick}
+                hoveredPlaceId={hoveredPlaceId}
+                onPlaceHover={onPlaceHover}
+                collapsed={placesCollapsed}
+                onToggleCollapsed={() => setPlacesCollapsed((c) => !c)}
+                height={placesHeight}
+                regionBbox={regionBbox}
+                regionCenter={regionCenter}
+                onSearchResultHover={onSearchResultHover}
+                onSearchResultSelect={onSearchResultSelect}
+                onSaveSearchResult={onSaveSearchResult}
+              />
+              <SavedRoutes
+                savedRoutes={savedRoutes}
+                activeRouteId={activeRouteId}
+                loadedRouteDetails={activeRouteId !== null ? route : null}
+                loading={loading}
+                onLoadRoute={onLoadRoute}
+                onDeleteRoute={onDeleteRoute}
+                onRenameRoute={onRenameRoute}
+                onToggleWalked={onToggleRouteWalked}
+                onClearLoadedRoute={onClearLoadedRoute}
+                collapsed={savedRoutesCollapsed}
+                onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
+                height={savedRoutesHeight}
+              />
+              <RouteComposer
+                isFavorite={isFavorite}
+                composing={composing}
+                onStartComposing={onStartComposing}
+                onStopComposing={onStopComposing}
+                selectedSegmentCount={selectedSegmentCount}
+                composedTotalDistance={composedTotalDistance}
+                composedIsLoop={composedIsLoop}
+                onUndoLast={onUndoLastSegment}
+                onClearAll={onClearAllSegments}
+                onSaveRoute={onSaveComposedRoute}
+                composerError={composerError}
+                collapsed={composerCollapsed}
+                onToggleCollapsed={() => setComposerCollapsed((c) => !c)}
+                height={composerHeight}
+              />
+              <RoutePlanner
+                route={route}
+                loading={loading}
+                error={error}
+                onGenerate={onGenerate}
+                onClear={onClear}
+                isFavorite={isFavorite}
+                places={places}
+                onSaveRoute={onSaveRoute}
+                activeRouteId={activeRouteId}
+                collapsed={routePlannerCollapsed}
+                onToggleCollapsed={() => setRoutePlannerCollapsed((c) => !c)}
+                height={rpHeight}
+                startTempPoint={startTempPoint}
+                endTempPoint={endTempPoint}
+                onPickPointOnMap={onPickPointOnMap}
+                onClearTempPoint={onClearTempPoint}
+                autoSelectPlace={autoSelectPlace}
+              />
+              <PathList
+                paths={paths}
+                walkedPathIds={walkedPathIds}
+                hoveredPathId={hoveredPathId}
+                onPathHover={onPathHover}
+                onPathClick={onPathClick}
+                collapsed={pathListCollapsed}
+                onToggleCollapsed={() => setPathListCollapsed((c) => !c)}
+                height={pathListHeight}
+              />
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
