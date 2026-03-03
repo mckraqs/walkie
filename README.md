@@ -1,7 +1,7 @@
 # Walkie
 
 A web application that generates curated walking routes based on user preferences.
-Region-agnostic by design -- any area with operator-provided spatial data becomes
+Region-agnostic by design - any area with operator-provided spatial data becomes
 available for route generation.
 
 ## Overview
@@ -11,7 +11,7 @@ accessibility), and receive a walking route displayed on an interactive map. The
 built for pleasant strolls, not cycling or driving navigation.
 
 Spatial data (paths, points of interest, areas) is provided by operators through
-standard geospatial formats. No city or region is hardcoded -- the system grows as new
+standard geospatial formats. No city or region is hardcoded - the system grows as new
 datasets are uploaded.
 
 ## Tech Stack
@@ -26,7 +26,7 @@ datasets are uploaded.
 - **Python 3.14+** (managed via [uv](https://docs.astral.sh/uv/))
 - **Node.js 25+** / npm 11+
 - **Docker Desktop**
-- **GDAL** -- `brew install gdal` on macOS (provides GDAL and GEOS libraries for
+- **GDAL** - `brew install gdal` on macOS (provides GDAL and GEOS libraries for
   GeoDjango)
 
 ## Getting Started
@@ -69,15 +69,33 @@ docker compose down
 
 ## Configuration
 
-See [docs/configuration.md](docs/configuration.md) for environment variables,
-GDAL/GEOS paths, CORS settings, and PostGIS image details.
+See [docs/technical/configuration.md](docs/technical/configuration.md) for environment
+variables, GDAL/GEOS paths, CORS settings, and PostGIS image details.
 
 ## Documentation
 
-Additional documentation lives in the [`docs/`](docs/) directory:
+Full documentation lives in the [`docs/`](docs/) directory. See the
+[table of contents](docs/index.md) for a complete listing.
 
-- [Configuration](docs/configuration.md) -- environment variables, library paths, CORS,
-  Docker image
-- [Data Pipeline](docs/data-pipeline.md) -- geoportal processing script, CLI arguments,
-  output schemas, management commands
-- [Models](docs/models.md) -- Django models (`Region`, `Path`), fields, relationships
+- **Onboarding**
+  - [overview](docs/onboarding/overview.md) (architecture, stacks, project structure)
+- **Technical**
+  - [models](docs/technical/models.md)
+  - [API](docs/technical/api-overview.md)
+  - [route generation](docs/technical/route-generation.md)
+  - [frontend](docs/technical/frontend-architecture.md)
+  - [data pipeline](docs/technical/data-pipeline.md)
+  - [configuration](docs/technical/configuration.md)
+  - [user management](docs/technical/user-management.md)
+  - [testing](docs/technical/testing.md)
+- **User Guide**
+  - [getting started](docs/user-guide/getting-started.md)
+  - [exploring](docs/user-guide/exploring-regions.md)
+  - [generating routes](docs/user-guide/generating-routes.md)
+  - [composing routes](docs/user-guide/composing-routes.md)
+  - [managing routes](docs/user-guide/managing-routes.md)
+  - [managing places](docs/user-guide/managing-places.md)
+  - [tracking progress](docs/user-guide/tracking-progress.md)
+  - [settings](docs/user-guide/settings.md)
+- **Reference**
+  - [glossary](docs/glossary.md)

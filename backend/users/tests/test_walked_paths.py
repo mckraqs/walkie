@@ -237,7 +237,7 @@ class TestGetWalkedPathIds:
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
-        # Coverage: segments 0 + 1 out of 3 -- roughly 2/3 >= 50%
+        # Coverage: segments 0 + 1 out of 3 - roughly 2/3 >= 50%
         assert response.status_code == 200
         assert path.pk in response.json()["walked_path_ids"]
 
@@ -287,7 +287,7 @@ class TestGetWalkedPathIds:
             "Other Path",
             [[(22.0, 52.0), (23.0, 53.0)]],
         )
-        # Walk the other region's segments -- shouldn't affect primary region
+        # Walk the other region's segments - shouldn't affect primary region
         Route.objects.create(
             user=user,
             region=other_region,
@@ -361,7 +361,7 @@ class TestGetWalkedPathIds:
             "Komunalna",
             [[(20.1, 50.1), (20.5, 50.5)], [(20.5, 50.5), (21.0, 51.0)]],
         )
-        # Walk only the short first sibling -- well below 50% of total
+        # Walk only the short first sibling - well below 50% of total
         Route.objects.create(
             user=user,
             region=region,
@@ -384,7 +384,7 @@ class TestGetWalkedPathIds:
         region: Region,
         favorite: FavoriteRegion,
     ) -> None:
-        """Unnamed paths are not grouped -- each evaluated on its own."""
+        """Unnamed paths are not grouped - each evaluated on its own."""
         path_a, segs_a = _create_path_with_segments(
             region,
             "",
@@ -429,7 +429,7 @@ class TestGetWalkedPathIds:
         ]
         path, segments = _create_path_with_segments(region, "Long Street", coords)
 
-        # Walk only the first segment -- 10% coverage, well below 50%
+        # Walk only the first segment - 10% coverage, well below 50%
         Route.objects.create(
             user=user,
             region=region,

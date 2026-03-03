@@ -444,7 +444,7 @@ export default function RegionExplorer({
         }
       }
 
-      // Topology check failed -- ask user for confirmation
+      // Topology check failed - ask user for confirmation
       setPendingDisconnectedSegment(segmentId);
       return prev;
     });

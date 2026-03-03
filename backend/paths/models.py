@@ -42,7 +42,7 @@ class Path(models.Model):
 
 
 class Segment(models.Model):
-    """A noded segment -- a path split at every intersection point.
+    """A noded segment - a path split at every intersection point.
 
     Topology (source/target) operates on segments so that every real
     intersection becomes a routable node.

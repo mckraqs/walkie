@@ -29,23 +29,23 @@ pre-commit checks before merge.
 ### Code Quality
 
 - Write self-documenting code with clear naming conventions
-- Keep functions focused and small -- single responsibility, single level of abstraction
+- Keep functions focused and small - single responsibility, single level of abstraction
 - Prefer explicit over implicit behavior; no hidden side effects
 - Use type annotations everywhere; code must pass pyright in standard mode
-- Handle edge cases and failure modes explicitly -- fail fast with descriptive errors
+- Handle edge cases and failure modes explicitly - fail fast with descriptive errors
 - Favor composition over inheritance; use dependency injection for testability
 
 ### Data Engineering
 
 - Validate data at ingestion boundaries; enforce schemas and data contracts between
   producers and consumers
-- Design pipelines to be idempotent and support incremental processing -- full refreshes
+- Design pipelines to be idempotent and support incremental processing - full refreshes
   only when explicitly justified
 - Document data lineage and transformation logic; treat pipeline metadata as
   a first-class artifact
-- Use appropriate data types for the domain -- precision matters (decimals for money,
+- Use appropriate data types for the domain - precision matters (decimals for money,
   proper types for timestamps, geometry, etc.)
-- Build data quality checks into pipelines, not as afterthoughts -- assert row counts,
+- Build data quality checks into pipelines, not as afterthoughts - assert row counts,
   null rates, and value distributions at each stage
 - Design for schema evolution from the start; prefer formats that handle additive
   changes gracefully (Parquet, Avro, Delta/Iceberg)
@@ -72,12 +72,12 @@ pre-commit checks before merge.
 - Write tests alongside implementation, not after; every module gets a corresponding
   test module
 - Use pytest with fixtures for setup; prefer fixtures over setUp/tearDown class methods
-- Test behavior, not implementation -- assert on outputs and side effects, not internal
+- Test behavior, not implementation - assert on outputs and side effects, not internal
   state
 - Cover edge cases and error paths, not just the happy path
 - Use parametrize for testing multiple input variations; avoid copy-pasted test
   functions
-- Keep tests fast and isolated -- mock external dependencies, never hit real databases
+- Keep tests fast and isolated - mock external dependencies, never hit real databases
   or APIs in unit tests
 
 ## When Uncertain

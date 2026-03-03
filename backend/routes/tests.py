@@ -1584,7 +1584,7 @@ class TestRouteExport:
         """Segments needing reversal are stitched correctly."""
         # Create two segments where the second is stored in reverse direction
         # Segment A: (20.0, 50.0) -> (20.001, 50.0)
-        # Segment B: (20.002, 50.0) -> (20.001, 50.0)  -- stored reversed
+        # Segment B: (20.002, 50.0) -> (20.001, 50.0)  - stored reversed
         seg_a = Segment.objects.create(
             region=region_with_topology,
             name="Stitch A",
@@ -1799,6 +1799,7 @@ class TestStitchSegmentCoordinatesFromIds:
         # Should form a path that returns to the start
         assert len(coords) > 0
         assert coords[0] == coords[-1]
+
 
 @pytest.mark.django_db
 class TestShortestPathFallback:

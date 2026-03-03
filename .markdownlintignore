@@ -1,0 +1,5 @@
+.claude/
+misc/
+node_modules/
+.venv/
+.pytest_cache/

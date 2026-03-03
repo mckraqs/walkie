@@ -5,13 +5,13 @@
 Copy `.env.example` to `.env` and adjust as needed. The backend falls back to
 development defaults (`walkie`/`walkie`/`walkie`) when variables are unset.
 
-| Variable            | Description              | Default     |
-| ------------------- | ------------------------ | ----------- |
-| `POSTGRES_DB`       | Database name            | `walkie`    |
-| `POSTGRES_USER`     | Database user            | `walkie`    |
-| `POSTGRES_PASSWORD` | Database password        | `walkie`    |
-| `POSTGRES_HOST`     | Database host            | `localhost` |
-| `POSTGRES_PORT`     | Database port            | `5432`      |
+| Variable            | Description       | Default     |
+| ------------------- | ----------------- | ----------- |
+| `POSTGRES_DB`       | Database name     | `walkie`    |
+| `POSTGRES_USER`     | Database user     | `walkie`    |
+| `POSTGRES_PASSWORD` | Database password | `walkie`    |
+| `POSTGRES_HOST`     | Database host     | `localhost` |
+| `POSTGRES_PORT`     | Database port     | `5432`      |
 
 ## GDAL / GEOS Library Paths
 
@@ -25,8 +25,8 @@ export GEOS_LIBRARY_PATH="/opt/homebrew/lib/libgeos_c.dylib"
 
 ## CORS
 
-The backend allows requests from `http://localhost:3000` (the Next.js dev server).
-This is configured in `backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
+The backend allows requests from `http://localhost:3000` (the Next.js dev server). This
+is configured in `backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
 
 ## Database Docker Image
 

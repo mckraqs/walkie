@@ -4,7 +4,7 @@ Fetches highway Ways from Overpass for a given relation and writes
 a GeoPackage with extra OSM metadata columns for local inspection
 (e.g. in QGIS). Prints summary statistics to stdout.
 
-Does NOT fetch region boundary or admin info -- use ``osm.py`` for
+Does NOT fetch region boundary or admin info - use ``osm.py`` for
 the full pipeline.
 
 Usage:

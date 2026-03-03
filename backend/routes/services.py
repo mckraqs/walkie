@@ -722,7 +722,7 @@ def _build_edges_sql(region_id: int) -> str:
     """Build the edges SQL query for pgRouting functions.
 
     pgRouting functions (pgr_drivingDistance, pgr_dijkstra) require a raw SQL
-    string for the edges query -- parameterized placeholders (%s) cannot be used
+    string for the edges query - parameterized placeholders (%s) cannot be used
     inside it. The ``int()`` cast is a defensive measure to guarantee the value
     is safe for interpolation even if this function is called outside a
     URL-validated code path.
