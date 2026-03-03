@@ -54,19 +54,18 @@ interface SidePanelProps {
   onPickPointOnMap: (which: "start" | "end") => void;
   onClearTempPoint: (which: "start" | "end") => void;
   autoSelectPlace: { which: "start" | "end"; placeId: number } | null;
-  showPlaces: boolean;
-  onToggleShowPlaces: () => void;
-  isCreatingPlace: boolean;
-  onToggleCreatingPlace: () => void;
+  placeCreationMode: "pin" | "search" | null;
+  onSetPlaceCreationMode: (mode: "pin" | "search" | null) => void;
   onDeletePlace: (placeId: number) => Promise<void>;
+  onRenamePlace: (placeId: number, newName: string) => Promise<void>;
   hoveredPlaceId: number | null;
   onPlaceHover: (placeId: number | null) => void;
+  onPlaceClick: (location: [number, number]) => void;
   regionBbox: [number, number, number, number] | null;
   regionCenter: [number, number] | null;
   onSearchResultHover: (location: [number, number] | null) => void;
   onSearchResultSelect: (result: GeocodingResult) => void;
   onSaveSearchResult: (name: string, location: [number, number]) => void;
-  onUseAsRoutePoint: (which: "start" | "end", coords: [number, number]) => void;
 }
 
 export function computeSectionHeight(
@@ -127,19 +126,18 @@ export default function SidePanel({
   onPickPointOnMap,
   onClearTempPoint,
   autoSelectPlace,
-  showPlaces,
-  onToggleShowPlaces,
-  isCreatingPlace,
-  onToggleCreatingPlace,
+  placeCreationMode,
+  onSetPlaceCreationMode,
   onDeletePlace,
+  onRenamePlace,
   hoveredPlaceId,
   onPlaceHover,
+  onPlaceClick,
   regionBbox,
   regionCenter,
   onSearchResultHover,
   onSearchResultSelect,
   onSaveSearchResult,
-  onUseAsRoutePoint,
 }: SidePanelProps) {
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(true);
@@ -177,16 +175,16 @@ export default function SidePanel({
     : "0";
 
   return (
-    <div className="absolute right-4 top-4 z-[1000] flex w-72 flex-col gap-2">
+    <div className="absolute right-4 top-4 z-[1000] flex w-80 flex-col gap-2">
       {isFavorite && (
         <>
           <Places
             places={places ?? []}
-            showPlaces={showPlaces}
-            onToggleShowPlaces={onToggleShowPlaces}
-            isCreatingPlace={isCreatingPlace}
-            onToggleCreatingPlace={onToggleCreatingPlace}
+            placeCreationMode={placeCreationMode}
+            onSetPlaceCreationMode={onSetPlaceCreationMode}
             onDeletePlace={onDeletePlace}
+            onRenamePlace={onRenamePlace}
+            onPlaceClick={onPlaceClick}
             hoveredPlaceId={hoveredPlaceId}
             onPlaceHover={onPlaceHover}
             collapsed={placesCollapsed}
@@ -194,11 +192,9 @@ export default function SidePanel({
             height={placesHeight}
             regionBbox={regionBbox}
             regionCenter={regionCenter}
-            routePlannerActive={!routePlannerCollapsed}
             onSearchResultHover={onSearchResultHover}
             onSearchResultSelect={onSearchResultSelect}
             onSaveSearchResult={onSaveSearchResult}
-            onUseAsRoutePoint={onUseAsRoutePoint}
           />
           <SavedRoutes
             savedRoutes={savedRoutes}

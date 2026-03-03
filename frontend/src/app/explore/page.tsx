@@ -14,6 +14,7 @@ import {
   fetchPlaces,
   fetchSavedRoutes,
   deletePlace,
+  updatePlace,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import RegionExplorer from "@/components/RegionExplorer";
@@ -58,8 +59,7 @@ export default function ExplorePage() {
   const [totalPaths, setTotalPaths] = useState(0);
   const [walkedCount, setWalkedCount] = useState(0);
   const [places, setPlaces] = useState<Place[]>([]);
-  const [showPlaces, setShowPlaces] = useState(false);
-  const [isCreatingPlace, setIsCreatingPlace] = useState(false);
+  const [placeCreationMode, setPlaceCreationMode] = useState<"pin" | "search" | null>(null);
   const [pendingPlaceLocation, setPendingPlaceLocation] = useState<[number, number] | null>(null);
   const [unfavoriteConfirm, setUnfavoriteConfirm] = useState<{ routeCount: number; placeCount: number } | null>(null);
 
@@ -128,8 +128,7 @@ export default function ExplorePage() {
   useEffect(() => {
     if (!selectedRegionId || !user || !isFavorite) {
       setPlaces([]);
-      setShowPlaces(false);
-      setIsCreatingPlace(false);
+      setPlaceCreationMode(null);
       setPendingPlaceLocation(null);
       return;
     }
@@ -150,7 +149,7 @@ export default function ExplorePage() {
 
   const handlePlaceCreated = useCallback((place: Place) => {
     setPendingPlaceLocation(null);
-    setIsCreatingPlace(false);
+    setPlaceCreationMode(null);
     setPlaces((prev) => [...prev, place]);
   }, []);
 
@@ -166,21 +165,16 @@ export default function ExplorePage() {
     setPendingPlaceLocation(null);
   }, []);
 
-  const handleExitPlaceCreation = useCallback(() => {
-    setIsCreatingPlace(false);
-    setPendingPlaceLocation(null);
+  const handleSetPlaceCreationMode = useCallback((mode: "pin" | "search" | null) => {
+    if (mode === null) setPendingPlaceLocation(null);
+    setPlaceCreationMode(mode);
   }, []);
 
-  const handleToggleShowPlaces = useCallback(() => {
-    setShowPlaces((v) => !v);
-  }, []);
-
-  const handleToggleCreatingPlace = useCallback(() => {
-    setIsCreatingPlace((v) => {
-      if (v) setPendingPlaceLocation(null);
-      return !v;
-    });
-  }, []);
+  const handleRenamePlace = useCallback(async (placeId: number, newName: string) => {
+    if (!selectedRegionId) return;
+    const updated = await updatePlace(selectedRegionId, placeId, { name: newName });
+    setPlaces((prev) => prev.map((p) => (p.id === placeId ? updated : p)));
+  }, [selectedRegionId]);
 
   const handleDeletePlace = useCallback(
     async (placeId: number) => {
@@ -445,17 +439,15 @@ export default function ExplorePage() {
             walkedPathIds={new Set(walkedPathIds)}
             onWalkedChange={handleWalkedChange}
             places={places}
-            showPlaces={showPlaces}
-            isCreatingPlace={isCreatingPlace}
+            placeCreationMode={placeCreationMode}
             pendingPlaceLocation={pendingPlaceLocation}
             onPlaceCreate={handlePlaceCreate}
             onPlaceCreated={handlePlaceCreated}
             onPlaceDeleted={handlePlaceDeleted}
             onCancelPlaceCreation={handleCancelPlaceCreation}
-            onExitPlaceCreation={handleExitPlaceCreation}
-            onToggleShowPlaces={handleToggleShowPlaces}
-            onToggleCreatingPlace={handleToggleCreatingPlace}
+            onSetPlaceCreationMode={handleSetPlaceCreationMode}
             onDeletePlace={handleDeletePlace}
+            onRenamePlace={handleRenamePlace}
           />
         )}
       </div>

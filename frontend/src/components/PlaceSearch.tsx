@@ -10,21 +10,17 @@ import type { GeocodingResult } from "@/types/geo";
 interface PlaceSearchProps {
   regionBbox: [number, number, number, number] | null;
   regionCenter: [number, number] | null;
-  routePlannerActive: boolean;
   onResultHover: (location: [number, number] | null) => void;
   onResultSelect: (result: GeocodingResult) => void;
   onSaveResult: (name: string, location: [number, number]) => void;
-  onUseAsRoutePoint: (which: "start" | "end", coords: [number, number]) => void;
 }
 
 export default function PlaceSearch({
   regionBbox,
   regionCenter,
-  routePlannerActive,
   onResultHover,
   onResultSelect,
   onSaveResult,
-  onUseAsRoutePoint,
 }: PlaceSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodingResult[]>([]);
@@ -122,34 +118,6 @@ export default function PlaceSearch({
                 >
                   <Plus className="h-3 w-3" />
                 </Button>
-                {routePlannerActive && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-green-600"
-                      title="Use as start"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUseAsRoutePoint("start", result.location);
-                      }}
-                    >
-                      <span className="text-[10px] font-bold">S</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-red-600"
-                      title="Use as end"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUseAsRoutePoint("end", result.location);
-                      }}
-                    >
-                      <span className="text-[10px] font-bold">E</span>
-                    </Button>
-                  </>
-                )}
               </div>
             </li>
           ))}

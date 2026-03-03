@@ -35,8 +35,9 @@ interface PathMapProps {
   walkedPathIds?: Set<number>;
   isFavorite?: boolean;
   places?: Place[];
-  showPlaces?: boolean;
   isCreatingPlace?: boolean;
+  focusPlaceLocation?: [number, number] | null;
+  focusPlaceKey?: number;
   onPlaceCreate?: (location: [number, number]) => void;
   onPlaceDelete?: () => void;
   composing?: boolean;
@@ -528,6 +529,18 @@ function SearchHighlightMarker({
   );
 }
 
+function FlyToPlace({ location }: { location: [number, number] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.flyTo([location[1], location[0]], Math.max(map.getZoom(), 15), {
+      duration: 0.5,
+    });
+  }, [map, location]);
+
+  return null;
+}
+
 function TempPointMarkers({
   startTempPoint,
   endTempPoint,
@@ -580,8 +593,9 @@ export default function PathMap({
   walkedPathIds,
   isFavorite,
   places,
-  showPlaces,
   isCreatingPlace,
+  focusPlaceLocation,
+  focusPlaceKey,
   onPlaceCreate,
   onPlaceDelete,
   composing,
@@ -700,8 +714,6 @@ export default function PathMap({
   isFavoriteRef.current = isFavorite;
   const composingRef = useRef(composing);
   composingRef.current = composing;
-  const showPlacesRef = useRef(showPlaces);
-  showPlacesRef.current = showPlaces;
 
   useEffect(() => {
     // When composerError changes and there's an error, we could flash the last clicked segment
@@ -722,7 +734,6 @@ export default function PathMap({
 
   function getBaseStyle(pathId: number): PathOptions {
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
-    if (showPlacesRef.current) return UNWALKED_DIMMED_STYLE;
     const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
     if (isFavoriteRef.current) {
       return walked ? WALKED_HIGHLIGHT_STYLE : UNWALKED_DIMMED_STYLE;
@@ -765,7 +776,7 @@ export default function PathMap({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walkedPathIds, hasRoute, isFavorite, showPlaces]);
+  }, [walkedPathIds, hasRoute, isFavorite]);
 
   // External hover drives style (highlight all siblings)
   useEffect(() => {
@@ -837,16 +848,19 @@ export default function PathMap({
         {pickingPoint && onPickPoint && (
           <PointPickingHandler onPickPoint={onPickPoint} />
         )}
-        {showPlaces && places && places.length > 0 && (
+        {places && places.length > 0 && (
           <PlaceMarkers places={places} hoveredPlaceId={hoveredPlaceId} onPlaceHover={onPlaceHover} />
         )}
         <TempPointMarkers startTempPoint={startTempPoint} endTempPoint={endTempPoint} />
         {searchHighlight && (
           <SearchHighlightMarker location={searchHighlight} />
         )}
+        {focusPlaceLocation && (
+          <FlyToPlace key={focusPlaceKey} location={focusPlaceLocation} />
+        )}
         {paths.features.length > 0 && (
           <GeoJSON
-            key={`paths-${hasRoute ? "dimmed" : showPlaces ? "places" : "normal"}`}
+            key={`paths-${hasRoute ? "dimmed" : "normal"}`}
             data={paths}
             style={pathStyleFn}
             onEachFeature={(feature, layer: Layer) => {

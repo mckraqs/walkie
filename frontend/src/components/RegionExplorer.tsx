@@ -44,17 +44,15 @@ interface RegionExplorerProps {
   walkedPathIds: Set<number>;
   onWalkedChange: (walkedPathIds: number[], totalPaths: number, walkedCount: number) => void;
   places: Place[];
-  showPlaces: boolean;
-  isCreatingPlace: boolean;
+  placeCreationMode: "pin" | "search" | null;
   pendingPlaceLocation: [number, number] | null;
   onPlaceCreate: (location: [number, number]) => void;
   onPlaceCreated: (place: Place) => void;
   onPlaceDeleted: () => void;
   onCancelPlaceCreation: () => void;
-  onExitPlaceCreation: () => void;
-  onToggleShowPlaces: () => void;
-  onToggleCreatingPlace: () => void;
+  onSetPlaceCreationMode: (mode: "pin" | "search" | null) => void;
   onDeletePlace: (placeId: number) => Promise<void>;
+  onRenamePlace: (placeId: number, newName: string) => Promise<void>;
 }
 
 export default function RegionExplorer({
@@ -65,17 +63,15 @@ export default function RegionExplorer({
   walkedPathIds,
   onWalkedChange,
   places,
-  showPlaces,
-  isCreatingPlace,
+  placeCreationMode,
   pendingPlaceLocation,
   onPlaceCreate,
   onPlaceCreated,
   onPlaceDeleted,
   onCancelPlaceCreation,
-  onExitPlaceCreation,
-  onToggleShowPlaces,
-  onToggleCreatingPlace,
+  onSetPlaceCreationMode,
   onDeletePlace,
+  onRenamePlace,
 }: RegionExplorerProps) {
   const { showToast } = useToast();
   const [route, setRoute] = useState<RouteResponse | null>(null);
@@ -102,6 +98,14 @@ export default function RegionExplorer({
   // Search state
   const [searchHighlight, setSearchHighlight] = useState<[number, number] | null>(null);
   const [pendingPlaceName, setPendingPlaceName] = useState<string | null>(null);
+
+  // Place focus state
+  const [focusPlaceLocation, setFocusPlaceLocation] = useState<[number, number] | null>(null);
+  const [focusPlaceKey, setFocusPlaceKey] = useState(0);
+  const handlePlaceClick = useCallback((location: [number, number]) => {
+    setFocusPlaceLocation(location);
+    setFocusPlaceKey((k) => k + 1);
+  }, []);
 
   const regionBbox = useMemo<[number, number, number, number] | null>(() => {
     if (!region?.geometry) return null;
@@ -257,8 +261,8 @@ export default function RegionExplorer({
     setSegments(null);
     setSelectedSegmentIds([]);
     setComposerError(null);
-    onExitPlaceCreation();
-  }, [onExitPlaceCreation]);
+    onSetPlaceCreationMode(null);
+  }, [onSetPlaceCreationMode]);
 
   const handleMapPickPoint = useCallback((coords: [number, number]) => {
     setPendingSavePointLocation(coords);
@@ -308,22 +312,13 @@ export default function RegionExplorer({
     onPlaceCreate(location);
   }, [onPlaceCreate]);
 
-  const handleSearchUseAsRoutePoint = useCallback((which: "start" | "end", coords: [number, number]) => {
-    const tp: TempPoint = { coords };
-    if (which === "start") {
-      setStartTempPoint(tp);
-    } else {
-      setEndTempPoint(tp);
-    }
-  }, []);
-
   // When entering compose mode, clear picking mode
   // When entering place creation mode, clear picking mode
   useEffect(() => {
-    if (isCreatingPlace) {
+    if (placeCreationMode === "pin") {
       setPickingPoint(null);
     }
-  }, [isCreatingPlace]);
+  }, [placeCreationMode]);
 
   // --- Composition: segment lookup map ---
   const segmentMap = useMemo(() => {
@@ -532,19 +527,18 @@ export default function RegionExplorer({
         onPickPointOnMap={handlePickPointOnMap}
         onClearTempPoint={handleClearTempPoint}
         autoSelectPlace={autoSelectPlace}
-        showPlaces={showPlaces}
-        onToggleShowPlaces={onToggleShowPlaces}
-        isCreatingPlace={isCreatingPlace}
-        onToggleCreatingPlace={onToggleCreatingPlace}
+        placeCreationMode={placeCreationMode}
+        onSetPlaceCreationMode={onSetPlaceCreationMode}
         onDeletePlace={onDeletePlace}
+        onRenamePlace={onRenamePlace}
         hoveredPlaceId={hoveredPlaceId}
         onPlaceHover={setHoveredPlaceId}
+        onPlaceClick={handlePlaceClick}
         regionBbox={regionBbox}
         regionCenter={regionCenter}
         onSearchResultHover={handleSearchResultHover}
         onSearchResultSelect={handleSearchResultSelect}
         onSaveSearchResult={handleSaveSearchResult}
-        onUseAsRoutePoint={handleSearchUseAsRoutePoint}
       />
       <PathMap
         region={region}
@@ -555,9 +549,10 @@ export default function RegionExplorer({
         walkedPathIds={walkedPathIds}
         isFavorite={isFavorite}
         places={places}
-        showPlaces={showPlaces}
-        isCreatingPlace={isCreatingPlace}
+        isCreatingPlace={placeCreationMode === "pin"}
         onPlaceCreate={onPlaceCreate}
+        focusPlaceLocation={focusPlaceLocation}
+        focusPlaceKey={focusPlaceKey}
         onPlaceDelete={onPlaceDeleted}
         composing={composing}
         segments={segments}
