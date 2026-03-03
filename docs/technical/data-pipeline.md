@@ -2,72 +2,82 @@
 
 ## Overview
 
-The geoportal data pipeline (`data/providers/geoportal.py`) transforms raw street data
-from [geoportal.gov.pl](https://geoportal.gov.pl) into cleaned, schema-aligned files
-ready for database ingestion.
+The OSM data pipeline (`data/providers/osm.py`) downloads street data from OpenStreetMap
+via the Overpass API for any OSM relation, transforms it into the Path model schema, and
+writes output files for the management commands.
 
-The streets dataset is the base datasource for paths in Poland. It contains all streets
-with their names and geometries, sourced from a WFS-downloaded GeoPackage.
+## How It Works
 
-## Processing Steps
-
-The `transform()` function performs the following:
-
-1. **Load** - reads the input GeoPackage layer into a GeoDataFrame.
-2. **Clean geometries** - drops rows with null, empty, or invalid geometries.
-3. **Build region codes** - constructs a `region_code` column from `teryt` and `simc`
-   fields (format: `{teryt}_{simc}`). Rows missing either field get an empty code.
-4. **Extract regions** - groups rows by `region_code`, computes a convex hull boundary
-   for each region, and writes a regions CSV.
-5. **Map to Path schema** - renames `nazwa` to `name`, adds default columns
-   (`category="street"`, `surface=""`, `accessible=False`, `is_lit=False`).
-6. **Write output** - saves the cleaned streets GeoPackage.
+1. **Fetch Ways** - queries the Overpass API for walking-relevant highway Ways within
+   the area defined by the given OSM relation ID.
+2. **Filter by region type** - selects highway types based on region type:
+   - **city**: residential, living_street, tertiary, secondary, primary, unclassified,
+     and their link variants.
+   - **wildlife**: path, track, footway, bridleway, cycleway, steps.
+3. **Normalize surfaces** - maps raw OSM `surface` tags to normalized categories
+   (asphalt/concrete -> paved, dirt/grass -> unpaved, gravel/compacted -> gravel).
+4. **Extract metadata** - reads `wheelchair=yes` for accessibility and `lit=yes` for
+   lighting.
+5. **Fetch region boundary** - retrieves the relation boundary polygon and parent
+   administrative districts (voivodeship at admin level 4, powiat at admin level 6).
+6. **Write outputs** - saves a streets GeoPackage and a regions CSV.
 
 ## Running the Script
 
 ```bash
-uv run python -m data.providers.geoportal \
-    --input_path data/raw/streets.gpkg \
+uv run python -m data.providers.osm \
+    --relation_id <OSM_RELATION_ID> \
     --streets_output_path data/processed/streets.gpkg \
     --regions_output_path data/processed/regions.csv \
-    --layer_name <layer-name>
+    --region_type city
 ```
 
 ### Arguments
 
-| Argument                | Description                            |
-| ----------------------- | -------------------------------------- |
-| `--input_path`          | Path to the input GeoPackage file      |
-| `--streets_output_path` | Path to the output streets GeoPackage  |
-| `--regions_output_path` | Path to the output regions CSV         |
-| `--layer_name`          | Layer name inside the input GeoPackage |
+| Argument                | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| `--relation_id`         | OSM relation ID for the target area          |
+| `--streets_output_path` | Path to the output streets GeoPackage file   |
+| `--regions_output_path` | Path to the output regions CSV file          |
+| `--region_type`         | Region type: `city` (default) or `wildlife`  |
+
+## Finding an OSM Relation ID
+
+1. Go to [openstreetmap.org](https://www.openstreetmap.org) and search for the desired
+   city or area.
+2. Click the result and look for the relation in the search results or sidebar.
+3. The URL will contain the numeric relation ID
+   (e.g., `https://www.openstreetmap.org/relation/123456`).
+4. Use that numeric ID as the `--relation_id` argument.
 
 ## Output Schemas
 
 ### Streets GeoPackage
 
-| Column        | Type            | Description                          |
-| ------------- | --------------- | ------------------------------------ |
-| `name`        | string          | Street name (from `nazwa`)           |
-| `geometry`    | MultiLineString | Street geometry                      |
-| `category`    | string          | Always `"street"`                    |
-| `surface`     | string          | Surface type (empty by default)      |
-| `accessible`  | boolean         | Accessibility flag (default `False`) |
-| `is_lit`      | boolean         | Lighting flag (default `False`)      |
-| `region_code` | string          | Region identifier (`{teryt}_{simc}`) |
+| Column        | Type            | Description                               |
+| ------------- | --------------- | ----------------------------------------- |
+| `name`        | string          | Street name from OSM `name` tag           |
+| `geometry`    | MultiLineString | Street geometry (EPSG:4326)               |
+| `category`    | string          | OSM `highway` tag value                   |
+| `surface`     | string          | Normalized surface (paved/gravel/unpaved) |
+| `accessible`  | boolean         | `True` if `wheelchair=yes`                |
+| `is_lit`      | boolean         | `True` if `lit=yes`                       |
+| `region_code` | string          | Region identifier (`osm_{relation_id}`)   |
 
 ### Regions CSV
 
-| Column         | Type   | Description                          |
-| -------------- | ------ | ------------------------------------ |
-| `region_code`  | string | Region identifier (`{teryt}_{simc}`) |
-| `name`         | string | Region name (from `miejscowosc`)     |
-| `boundary_wkt` | string | Convex hull boundary as WKT          |
+| Column                          | Type   | Description                             |
+| ------------------------------- | ------ | --------------------------------------- |
+| `region_code`                   | string | Region identifier (`osm_{relation_id}`) |
+| `name`                          | string | Relation name from OSM                  |
+| `boundary_wkt`                  | string | Boundary polygon as WKT                 |
+| `administrative_district_lvl_1` | string | Voivodeship name (admin level 4)        |
+| `administrative_district_lvl_2` | string | Powiat name (admin level 6)             |
 
 ## Management Commands
 
 After running the pipeline, load the processed data into the database using Django
-management commands. Regions must be loaded before streets, because `Path` records
+management commands. Regions must be loaded before paths, because `Path` records
 reference `Region` via foreign key.
 
 ### `load_regions`
@@ -83,13 +93,13 @@ uv run python backend/manage.py load_regions data/processed/regions.csv
 | `--batch-size` | Number of records per `bulk_create` call         | `500`   |
 | `--dry-run`    | Preview the load without writing to the database | off     |
 
-### `load_streets`
+### `load_paths`
 
 Imports streets from the pipeline's GeoPackage output into the `Path` model. Matches
 each row's `region_code` to an existing `Region` for the foreign key.
 
 ```bash
-uv run python backend/manage.py load_streets data/processed/streets.gpkg
+uv run python backend/manage.py load_paths data/processed/streets.gpkg
 ```
 
 | Option         | Description                                      | Default |
@@ -99,7 +109,7 @@ uv run python backend/manage.py load_streets data/processed/streets.gpkg
 
 ### `load_segments`
 
-Creates noded segments from existing paths. Unlike `load_streets` which loads raw path
+Creates noded segments from existing paths. Unlike `load_paths` which loads raw path
 geometries directly from the pipeline output, `load_segments` operates on paths already
 in the database and splits them at every intersection to create routable sub-units.
 
@@ -136,13 +146,6 @@ table. This populates the `source` and `target` columns needed for route generat
 **Must be run after `load_segments`**, because it operates on segments already in the
 database.
 
-Required execution order:
-
-1. `load_regions`
-2. `load_streets`
-3. `load_segments`
-4. `build_topology`
-
 ```bash
 uv run python backend/manage.py build_topology
 ```
@@ -151,3 +154,12 @@ uv run python backend/manage.py build_topology
 | ------------- | ------------------------------------------ | --------- |
 | `--tolerance` | Snapping tolerance for node matching       | `0.00001` |
 | `--clean`     | Drop and rebuild the topology from scratch | off       |
+
+## Execution Order
+
+The commands must be run in this order:
+
+1. `load_regions`
+2. `load_paths`
+3. `load_segments`
+4. `build_topology`

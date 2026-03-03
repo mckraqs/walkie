@@ -7,14 +7,14 @@
 
 ## Technical Reference
 
+- [Local Setup](technical/local-setup.md) - complete local environment setup guide
 - [Models](technical/models.md) - all Django models, fields, relationships, ER diagram
 - [API Overview](technical/api-overview.md) - REST endpoints grouped by domain
 - [Route Generation](technical/route-generation.md) - pgRouting algorithm, cost
   randomization, constants
 - [Frontend Architecture](technical/frontend-architecture.md) - components, state
   management, map integration
-- [Data Pipeline](technical/data-pipeline.md) - geoportal processing, management
-  commands
+- [Data Pipeline](technical/data-pipeline.md) - OSM data processing, management commands
 - [Configuration](technical/configuration.md) - environment variables, GDAL/GEOS, CORS,
   Docker
 - [User Management](technical/user-management.md) - admin panel operations, tokens,

@@ -25,8 +25,9 @@ export GEOS_LIBRARY_PATH="/opt/homebrew/lib/libgeos_c.dylib"
 
 ## CORS
 
-The backend allows requests from `http://localhost:3000` (the Next.js dev server). This
-is configured in `backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
+The backend allows requests from `http://localhost:3000` and `http://localhost:3001`
+(the Next.js dev server, which picks whichever port is available). This is configured in
+`backend/walkie/settings.py` via `CORS_ALLOWED_ORIGINS`.
 
 ## Database Docker Image
 
