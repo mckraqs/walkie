@@ -107,6 +107,14 @@ export default function RegionExplorer({
     setFocusPlaceKey((k) => k + 1);
   }, []);
 
+  // Path focus state
+  const [focusPathId, setFocusPathId] = useState<number | null>(null);
+  const [focusPathKey, setFocusPathKey] = useState(0);
+  const handlePathClick = useCallback((pathId: number) => {
+    setFocusPathId(pathId);
+    setFocusPathKey((k) => k + 1);
+  }, []);
+
   const regionBbox = useMemo<[number, number, number, number] | null>(() => {
     if (!region?.geometry) return null;
     let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
@@ -522,6 +530,7 @@ export default function RegionExplorer({
         walkedPathIds={walkedPathIds}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
+        onPathClick={handlePathClick}
         startTempPoint={startTempPoint}
         endTempPoint={endTempPoint}
         onPickPointOnMap={handlePickPointOnMap}
@@ -568,6 +577,8 @@ export default function RegionExplorer({
         startTempPoint={startTempPoint}
         endTempPoint={endTempPoint}
         searchHighlight={searchHighlight}
+        focusPathId={focusPathId}
+        focusPathKey={focusPathKey}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog

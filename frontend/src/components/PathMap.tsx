@@ -54,6 +54,8 @@ interface PathMapProps {
   hoveredPlaceId?: number | null;
   onPlaceHover?: (placeId: number | null) => void;
   searchHighlight?: [number, number] | null;
+  focusPathId?: number | null;
+  focusPathKey?: number;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -541,6 +543,64 @@ function FlyToPlace({ location }: { location: [number, number] }) {
   return null;
 }
 
+function FitToPath({
+  pathId,
+  paths,
+}: {
+  pathId: number;
+  paths: PathFeatureCollection;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const feature = paths.features.find((f) => f.id === pathId);
+    if (!feature) return;
+
+    // Collect all features sharing the same name (the full road geometry)
+    const name = feature.properties.name;
+    const siblings = name
+      ? paths.features.filter((f) => f.properties.name === name)
+      : [feature];
+
+    const group = L.featureGroup(
+      siblings.map((f) => L.geoJSON(f.geometry)),
+    );
+    const bounds = group.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+    }
+  }, [map, pathId, paths]);
+
+  return null;
+}
+
+function TooltipRepositioner({
+  tooltipData,
+  pathFeatureMap,
+  tooltipPosRef,
+  tooltipElRef,
+}: {
+  tooltipData: { pathId: number; fromTable?: boolean } | null;
+  pathFeatureMap: Map<number, PathFeature>;
+  tooltipPosRef: React.MutableRefObject<{ x: number; y: number }>;
+  tooltipElRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const map = useMap();
+  useMapEvents({
+    moveend: () => {
+      if (!tooltipData?.fromTable || !tooltipElRef.current) return;
+      const feature = pathFeatureMap.get(tooltipData.pathId);
+      if (!feature) return;
+      const center = L.geoJSON(feature.geometry).getBounds().getCenter();
+      const pt = map.latLngToContainerPoint(center);
+      tooltipPosRef.current = { x: pt.x + 12, y: pt.y - 12 };
+      tooltipElRef.current.style.left = `${pt.x + 12}px`;
+      tooltipElRef.current.style.top = `${pt.y - 12}px`;
+    },
+  });
+  return null;
+}
+
 function TempPointMarkers({
   startTempPoint,
   endTempPoint,
@@ -612,6 +672,8 @@ export default function PathMap({
   hoveredPlaceId,
   onPlaceHover,
   searchHighlight,
+  focusPathId,
+  focusPathKey,
 }: PathMapProps) {
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
@@ -832,6 +894,12 @@ export default function PathMap({
         />
         <FitBounds region={region} paths={paths} route={route} />
         <MapRefSetter />
+        <TooltipRepositioner
+          tooltipData={tooltipData}
+          pathFeatureMap={pathFeatureMap}
+          tooltipPosRef={tooltipPosRef}
+          tooltipElRef={tooltipElRef}
+        />
         <ResetViewControl region={region} paths={paths} />
         <MeasureControl active={measureActive} onToggle={toggleMeasure} />
         {measureActive && !isCreatingPlace && !pickingPoint && (
@@ -857,6 +925,9 @@ export default function PathMap({
         )}
         {focusPlaceLocation && (
           <FlyToPlace key={focusPlaceKey} location={focusPlaceLocation} />
+        )}
+        {focusPathId != null && (
+          <FitToPath key={focusPathKey} pathId={focusPathId} paths={paths} />
         )}
         {paths.features.length > 0 && (
           <GeoJSON

@@ -49,6 +49,7 @@ interface SidePanelProps {
   walkedPathIds: Set<number>;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
+  onPathClick: (pathId: number) => void;
   startTempPoint: TempPoint | null;
   endTempPoint: TempPoint | null;
   onPickPointOnMap: (which: "start" | "end") => void;
@@ -121,6 +122,7 @@ export default function SidePanel({
   walkedPathIds,
   hoveredPathId,
   onPathHover,
+  onPathClick,
   startTempPoint,
   endTempPoint,
   onPickPointOnMap,
@@ -250,6 +252,7 @@ export default function SidePanel({
             walkedPathIds={walkedPathIds}
             hoveredPathId={hoveredPathId}
             onPathHover={onPathHover}
+            onPathClick={onPathClick}
             collapsed={pathListCollapsed}
             onToggleCollapsed={() => setPathListCollapsed((c) => !c)}
             height={pathListHeight}
