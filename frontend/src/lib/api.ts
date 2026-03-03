@@ -43,7 +43,7 @@ function handle401(res: Response): void {
     authToken = null;
     if (typeof window !== "undefined") {
       localStorage.removeItem("authToken");
-      window.location.href = "/";
+      window.location.href = "/explore";
     }
   }
 }

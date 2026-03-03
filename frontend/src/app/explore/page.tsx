@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Star } from "lucide-react";
 
 import {
@@ -17,6 +16,7 @@ import {
   updatePlace,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import LoginForm from "@/components/LoginForm";
 import RegionExplorer from "@/components/RegionExplorer";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -42,7 +42,6 @@ const NO_DISTRICT = "__all__";
 const NO_REGION = "__none__";
 
 export default function ExplorePage() {
-  const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
 
   const [regions, setRegions] = useState<RegionListItem[]>([]);
@@ -62,12 +61,6 @@ export default function ExplorePage() {
   const [placeCreationMode, setPlaceCreationMode] = useState<"pin" | "search" | null>(null);
   const [pendingPlaceLocation, setPendingPlaceLocation] = useState<[number, number] | null>(null);
   const [unfavoriteConfirm, setUnfavoriteConfirm] = useState<{ routeCount: number; placeCount: number } | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/");
-    }
-  }, [authLoading, user, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -301,10 +294,27 @@ export default function ExplorePage() {
     }
   }
 
-  if (authLoading || (!user && !error)) {
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background font-sans">
+        <div className="fixed right-4 top-4">
+          <ThemeToggle />
+        </div>
+        <main className="flex w-full max-w-md flex-col items-center gap-8 px-6">
+          <h1 className="text-4xl font-bold tracking-tight">Walkie</h1>
+          <p className="text-center text-lg text-muted-foreground">
+            Explore paths and streets within a region.
+          </p>
+          <LoginForm />
+        </main>
       </div>
     );
   }
