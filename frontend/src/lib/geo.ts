@@ -78,8 +78,17 @@ export function getRouteEndpoints(
 
     if (currentNode === seg.properties.source) {
       currentNode = seg.properties.target;
-    } else {
+    } else if (currentNode === seg.properties.target) {
       currentNode = seg.properties.source;
+    } else {
+      // Gap detected — determine orientation by peeking at the next segment
+      const nextSeg = i + 1 < segIds.length ? segMap.get(segIds[i + 1]) : null;
+      if (nextSeg && (nextSeg.properties.source === seg.properties.source
+                    || nextSeg.properties.target === seg.properties.source)) {
+        currentNode = seg.properties.source;
+      } else {
+        currentNode = seg.properties.target;
+      }
     }
   }
 

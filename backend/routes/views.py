@@ -30,7 +30,6 @@ from routes.services import (
     generate_route,
     get_route_path_names,
     get_route_segments,
-    validate_segment_connectivity,
 )
 from users.models import FavoriteRegion
 from users.views import _get_walked_paths
@@ -205,12 +204,6 @@ class RouteListCreateView(APIView):
         if existing_count != len(set(segment_ids)):
             return Response(
                 {"detail": "One or more segment IDs do not belong to this region."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if is_custom and not validate_segment_connectivity(segment_ids):
-            return Response(
-                {"detail": "Segments do not form a connected route."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

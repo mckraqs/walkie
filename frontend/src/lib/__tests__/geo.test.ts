@@ -137,6 +137,48 @@ describe("getRouteEndpoints", () => {
     expect(result.startNode).toBe(10);
     expect(result.endNode).toBe(10);
   });
+
+  it("handles gap with look-ahead to orient disconnected segment", () => {
+    // Chain: A(1->2), B(2->3), gap, C(5->6), D(6->7)
+    // C's orientation determined by peeking at D: D shares node 6 with C's target,
+    // so C is traversed source->target, ending at 6; then D ends at 7.
+    const segA = makeSegmentFeature(1, 1, 2);
+    const segB = makeSegmentFeature(2, 2, 3);
+    const segC = makeSegmentFeature(3, 5, 6);
+    const segD = makeSegmentFeature(4, 6, 7);
+    const map = buildMap(segA, segB, segC, segD);
+    expect(getRouteEndpoints([1, 2, 3, 4], map)).toEqual({
+      startNode: 1,
+      endNode: 7,
+    });
+  });
+
+  it("handles gap at end with no look-ahead (defaults to target)", () => {
+    // Chain: A(1->2), B(2->3), gap, C(5->6)
+    // No next segment after C, so default to target (6).
+    const segA = makeSegmentFeature(1, 1, 2);
+    const segB = makeSegmentFeature(2, 2, 3);
+    const segC = makeSegmentFeature(3, 5, 6);
+    const map = buildMap(segA, segB, segC);
+    expect(getRouteEndpoints([1, 2, 3], map)).toEqual({
+      startNode: 1,
+      endNode: 6,
+    });
+  });
+
+  it("handles multiple gaps correctly", () => {
+    // Chain: A(1->2), gap, B(5->6), C(6->7)
+    // B's orientation determined by peeking at C: C shares node 6 with B's target,
+    // so B traverses source->target ending at 6; then C ends at 7.
+    const segA = makeSegmentFeature(1, 1, 2);
+    const segB = makeSegmentFeature(2, 5, 6);
+    const segC = makeSegmentFeature(3, 6, 7);
+    const map = buildMap(segA, segB, segC);
+    expect(getRouteEndpoints([1, 2, 3], map)).toEqual({
+      startNode: 1,
+      endNode: 7,
+    });
+  });
 });
 
 describe("getEndpointCoords", () => {

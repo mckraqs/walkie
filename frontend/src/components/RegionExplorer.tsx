@@ -12,11 +12,7 @@ import {
   renameRoute,
   fetchRegionSegments,
 } from "@/lib/api";
-import {
-  haversineDistance,
-  getEndpointCoords,
-  getRouteEndpoints,
-} from "@/lib/geo";
+import { getRouteEndpoints } from "@/lib/geo";
 import SidePanel from "@/components/SidePanel";
 import PlaceNameDialog from "@/components/PlaceNameDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -39,8 +35,6 @@ export interface TempPoint {
 }
 
 const PathMap = dynamic(() => import("@/components/PathMap"), { ssr: false });
-
-const PROXIMITY_TOLERANCE_M = 100;
 
 interface RegionExplorerProps {
   regionId: string;
@@ -97,6 +91,7 @@ export default function RegionExplorer({
   const [segments, setSegments] = useState<SegmentFeatureCollection | null>(null);
   const [selectedSegmentIds, setSelectedSegmentIds] = useState<number[]>([]);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [pendingDisconnectedSegment, setPendingDisconnectedSegment] = useState<number | null>(null);
 
   // Point picking state
   const [pickingPoint, setPickingPoint] = useState<"start" | "end" | null>(null);
@@ -423,33 +418,34 @@ export default function RegionExplorer({
         return [segmentId, ...prev];
       }
 
-      // Topology check failed -- fall back to proximity check
-      const { start: routeStart, end: routeEnd } = getEndpointCoords(prev, segmentMap);
-      const newCoords = newSeg.geometry.coordinates;
-      const newSource = newCoords[0] as [number, number];
-      const newTarget = newCoords[newCoords.length - 1] as [number, number];
+      // Handle gaps at route boundaries: when the boundary segment is
+      // disconnected from its neighbor, allow connecting to either of its nodes.
+      if (prev.length >= 2) {
+        const lastSeg = segmentMap.get(prev[prev.length - 1]);
+        const prevToLast = segmentMap.get(prev[prev.length - 2]);
+        if (lastSeg && prevToLast) {
+          const lastNodes = [lastSeg.properties.source, lastSeg.properties.target];
+          const prevToLastNodes = [prevToLast.properties.source, prevToLast.properties.target];
+          const hasEndGap = !lastNodes.some((n) => prevToLastNodes.includes(n));
+          if (hasEndGap && lastNodes.some((n) => newNodes.includes(n))) {
+            return [...prev, segmentId];
+          }
+        }
 
-      // Check if new segment is within proximity of route end (append)
-      if (routeEnd) {
-        const dEndSrc = haversineDistance(routeEnd, newSource);
-        const dEndTgt = haversineDistance(routeEnd, newTarget);
-        if (dEndSrc <= PROXIMITY_TOLERANCE_M || dEndTgt <= PROXIMITY_TOLERANCE_M) {
-          return [...prev, segmentId];
+        const firstSeg = segmentMap.get(prev[0]);
+        const secondSeg = segmentMap.get(prev[1]);
+        if (firstSeg && secondSeg) {
+          const firstNodes = [firstSeg.properties.source, firstSeg.properties.target];
+          const secondNodes = [secondSeg.properties.source, secondSeg.properties.target];
+          const hasStartGap = !firstNodes.some((n) => secondNodes.includes(n));
+          if (hasStartGap && firstNodes.some((n) => newNodes.includes(n))) {
+            return [segmentId, ...prev];
+          }
         }
       }
 
-      // Check if new segment is within proximity of route start (prepend)
-      if (routeStart) {
-        const dStartSrc = haversineDistance(routeStart, newSource);
-        const dStartTgt = haversineDistance(routeStart, newTarget);
-        if (dStartSrc <= PROXIMITY_TOLERANCE_M || dStartTgt <= PROXIMITY_TOLERANCE_M) {
-          return [segmentId, ...prev];
-        }
-      }
-
-      // Not connected - reject
-      setComposerError("Segment is not adjacent to the current route.");
-      setTimeout(() => setComposerError(null), 2000);
+      // Topology check failed -- ask user for confirmation
+      setPendingDisconnectedSegment(segmentId);
       return prev;
     });
   }, [segmentMap]);
@@ -462,6 +458,16 @@ export default function RegionExplorer({
   const handleClearAllSegments = useCallback(() => {
     setSelectedSegmentIds([]);
     setComposerError(null);
+  }, []);
+
+  const handleConfirmDisconnected = useCallback(() => {
+    if (pendingDisconnectedSegment === null) return;
+    setSelectedSegmentIds((prev) => [...prev, pendingDisconnectedSegment]);
+    setPendingDisconnectedSegment(null);
+  }, [pendingDisconnectedSegment]);
+
+  const handleCancelDisconnected = useCallback(() => {
+    setPendingDisconnectedSegment(null);
   }, []);
 
   const handleSaveComposedRoute = useCallback(
@@ -615,6 +621,17 @@ export default function RegionExplorer({
           variant="default"
           onConfirm={handleSaveAsPlace}
           onCancel={handleUseOnce}
+        />
+      )}
+      {pendingDisconnectedSegment !== null && (
+        <ConfirmDialog
+          title="Segments not connected"
+          message="The selected segment does not connect to the current route. Add it anyway?"
+          confirmLabel="Add Segment"
+          cancelLabel="Cancel"
+          variant="default"
+          onConfirm={handleConfirmDisconnected}
+          onCancel={handleCancelDisconnected}
         />
       )}
     </div>
