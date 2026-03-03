@@ -23,17 +23,19 @@
 
 ## User Guide
 
-- [Getting Started](user-guide/getting-started.md) - login, home screen
-- [Exploring Regions](user-guide/exploring-regions.md) - browsing, filtering, favoriting
-- [Generating Routes](user-guide/generating-routes.md) - distance, type, start/end
-  points
-- [Composing Routes](user-guide/composing-routes.md) - manual segment selection
-- [Managing Routes](user-guide/managing-routes.md) - saving, loading, renaming, walked,
-  export
-- [Managing Places](user-guide/managing-places.md) - creating, searching, using as
+- [Getting Started](user-guide/01-getting-started.md) - login, home screen
+- [Exploring Regions](user-guide/02-exploring-regions.md) - browsing, filtering,
+  favoriting
+- [Managing Places](user-guide/03-managing-places.md) - creating, searching, using as
   endpoints
-- [Tracking Progress](user-guide/tracking-progress.md) - walked paths, coverage counter
-- [Settings](user-guide/settings.md) - theme toggle
+- [Generating Routes](user-guide/04-generating-routes.md) - distance, type, start/end
+  points
+- [Composing Routes](user-guide/05-composing-routes.md) - manual segment selection
+- [Managing Routes](user-guide/06-managing-routes.md) - saving, loading, renaming,
+  walked, export
+- [Tracking Progress](user-guide/07-tracking-progress.md) - walked paths, coverage
+  counter
+- [Settings](user-guide/08-settings.md) - theme toggle
 
 ## Reference
 
