@@ -336,7 +336,7 @@ export default function ExplorePage() {
             <SelectTrigger className="h-9 w-auto min-w-[180px]">
               <SelectValue placeholder="Select a region..." />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper">
               {!selectedRegionId && (
                 <SelectItem value={NO_REGION}>Select a region...</SelectItem>
               )}
