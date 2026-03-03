@@ -144,10 +144,13 @@ function getSegmentColor(sequenceIndex: number, total: number): string {
 
 function buildRouteTooltip(
   props: PathFeature["properties"],
+  geometry: GeoJSON.LineString | GeoJSON.MultiLineString,
   total: number,
 ): string {
+  const distKm = (computePathLength(geometry) / 1000).toFixed(1);
   const lines = [
     `<strong>${props.name || "Unnamed"}</strong>`,
+    `Distance: ${distKm} km`,
     `Category: ${props.category}`,
     `Surface: ${props.surface || "unknown"}`,
   ];
@@ -399,6 +402,19 @@ function haversineDistance(
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function computePathLength(geometry: GeoJSON.LineString | GeoJSON.MultiLineString): number {
+  const lines = geometry.type === "MultiLineString"
+    ? geometry.coordinates
+    : [geometry.coordinates];
+  let total = 0;
+  for (const line of lines) {
+    for (let i = 1; i < line.length; i++) {
+      total += haversineDistance(line[i - 1][1], line[i - 1][0], line[i][1], line[i][0]);
+    }
+  }
+  return total;
 }
 
 function formatDistance(meters: number): string {
@@ -1003,8 +1019,9 @@ export default function PathMap({
                 const props = (feature as PathFeature).properties;
                 const seqIdx = props.sequence_index ?? 0;
                 const segmentColor = getSegmentColor(seqIdx, totalSegments);
+                const pathFeature = feature as PathFeature;
                 layer.bindTooltip(
-                  buildRouteTooltip(props, totalSegments),
+                  buildRouteTooltip(props, pathFeature.geometry, totalSegments),
                   { sticky: true },
                 );
 
@@ -1121,6 +1138,17 @@ export default function PathMap({
           <strong className="text-card-foreground">
             {tooltipData.props.name || "Unnamed"}
           </strong>
+          <div className="text-muted-foreground">
+            Distance: {(() => {
+              const ids = siblingIdsMap.get(tooltipData.pathId) ?? [tooltipData.pathId];
+              let total = 0;
+              for (const id of ids) {
+                const f = pathFeatureMap.get(id);
+                if (f) total += computePathLength(f.geometry);
+              }
+              return (total / 1000).toFixed(1);
+            })()} km
+          </div>
           <div className="text-muted-foreground">
             Category: {tooltipData.props.category}
           </div>
