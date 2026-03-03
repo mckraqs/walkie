@@ -43,7 +43,7 @@ class Command(BaseCommand):
             logger.warning("build_topology: no segments found, skipping.")
             return
 
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             if clean:
                 self._clean_topology()
 

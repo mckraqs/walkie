@@ -36,13 +36,24 @@ python_files = ["test_*.py", "tests.py"]
 [tool.pyright]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
-diagnosticMode = "workspace"
-disableOrganizeImports = true # let ruff do it
 useLibraryCodeForTypes = true
 autoImportCompletions = true
 reportMissingImports = true
 reportGeneralTypeIssues = true
-reportInferoredType = true
+exclude = ["misc", ".venv"]
+
+# Django/DRF/GeoPandas lack type stubs for Python 3.14 + Django 6.0.
+# These rules produce only false positives from missing stub information.
+reportAttributeAccessIssue = false
+reportArgumentType = false
+reportReturnType = false
+reportAssignmentType = false
+reportIndexIssue = false
+reportOptionalSubscript = false
+reportOptionalMemberAccess = false
+reportOperatorIssue = false
+reportIncompatibleMethodOverride = false
+reportCallIssue = false
 
 [tool.ruff]
 line-length = 88

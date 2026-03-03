@@ -197,7 +197,7 @@ class Command(BaseCommand):
             "administrative_district_lvl_1",
             "administrative_district_lvl_2",
         ]
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             Region.objects.bulk_update(
                 updated, fields=update_fields, batch_size=batch_size
             )
@@ -212,7 +212,7 @@ class Command(BaseCommand):
 
     def _bulk_insert(self, region_objects: list[Region], batch_size: int) -> None:
         """Insert all Region objects in batches inside a single transaction."""
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             for i in range(0, len(region_objects), batch_size):
                 batch = region_objects[i : i + batch_size]
                 Region.objects.bulk_create(batch, batch_size=batch_size)

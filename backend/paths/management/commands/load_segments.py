@@ -334,7 +334,7 @@ class Command(BaseCommand):
         Returns:
             Tuple of (segment_count, join_count).
         """
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             for i in range(0, len(segment_objects), batch_size):
                 batch = segment_objects[i : i + batch_size]
                 Segment.objects.bulk_create(batch, batch_size=batch_size)

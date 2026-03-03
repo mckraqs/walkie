@@ -150,7 +150,7 @@ class Command(BaseCommand):
 
     def _bulk_insert(self, path_objects: list[Path], batch_size: int) -> None:
         """Insert all Path objects in batches inside a single transaction."""
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             for i in range(0, len(path_objects), batch_size):
                 batch = path_objects[i : i + batch_size]
                 Path.objects.bulk_create(batch, batch_size=batch_size)

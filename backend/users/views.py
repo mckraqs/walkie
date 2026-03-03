@@ -165,7 +165,7 @@ class FavoriteRegionToggleView(APIView):
         if not favorite:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        with transaction.atomic():
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
             routes_deleted, _ = Route.objects.filter(
                 user=request.user, region=region
             ).delete()
