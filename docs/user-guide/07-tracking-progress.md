@@ -17,10 +17,3 @@ they are evaluated together. Unnamed paths are evaluated individually.
 
 Toggle the "walked" status on any saved route. When you mark a route as walked, the
 paths covered by that route are recalculated and your counter updates.
-
-## Filtering Walked Paths
-
-Click the "Walked" button in the header to toggle the map view:
-
-- **Off** - shows all paths in the region
-- **On** - shows only the paths you have walked (highlighted on the map)

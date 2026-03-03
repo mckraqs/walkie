@@ -29,32 +29,19 @@
 
 ### Home Page (`/`)
 
-The home page is the entry point to Walkie. It serves two different experiences based on
-authentication status:
-
-**Unauthenticated state:**
-
-- Login form with username and password fields
-- Theme toggle in the top-right corner
-
-**Authenticated state:**
-
-- Username displayed in the top-right corner
-- "Browse regions" button to navigate to the explore page
-- "Logout" button
-- Theme toggle in the top-right corner
+The home page redirects to `/explore`. It contains no UI of its own.
 
 ### Explore Page (`/explore`)
 
-The explore page is the main application interface. Layout includes:
+The explore page is the main application interface. When unauthenticated, it displays
+a login form with the app title and a theme toggle. When authenticated, layout includes:
 
 - **Header bar** with district filter dropdown, region selector dropdown, favorite
-  toggle, and walked counter badge
-- **Full-height interactive map** showing region boundaries, paths, routes, segments (in
-  compose mode), and places
-- **Left-side collapsible panel** for route planning, route composition, saved routes,
-  path list, places, and place search
-- **Theme toggle** in the top-right corner
+  toggle, walked counter badge, username, logout button, and theme toggle
+- **Full-height interactive map** showing region boundaries, paths (with hover tooltips
+  showing distance in km), routes, segments (in compose mode), and places
+- **Right-side collapsible panel** for places, saved routes, route composition,
+  route planning, and path list
 
 ## Component Hierarchy
 
@@ -64,21 +51,20 @@ RootLayout
     AuthProvider
       ToastProvider
         Home (/)
-          LoginForm
-          ThemeToggle
+          redirect("/explore")
         ExplorePage (/explore)
-          RegionExplorer
+          LoginForm (unauthenticated)
+          ThemeToggle
+          RegionExplorer (authenticated)
             SidePanel
-              RoutePlanner
-              RouteComposer
+              Places (embeds PlaceSearch)
               SavedRoutes
+              RouteComposer
+              RoutePlanner
               PathList
-              Places
-              PlaceSearch
             PathMap (dynamic import, SSR disabled)
               PlaceNameDialog
               ConfirmDialog
-          ThemeToggle
 ```
 
 ### Component Descriptions
@@ -95,20 +81,20 @@ and login/logout logic.
 **ToastProvider** Context provider wrapping Sonner's toast system for application-wide
 notifications.
 
-**Home** Login page component. Renders LoginForm for unauthenticated users or browse
-button and user info for authenticated users.
+**Home** Redirect component. Navigates to `/explore`.
 
-**ExplorePage** Main application page. Manages region state and distributes it to child
-components.
+**ExplorePage** Main application page. Renders LoginForm when unauthenticated. When
+authenticated, manages region state and distributes it to child components.
 
 **RegionExplorer** Container component coordinating map and side panel. Manages route
 data, composing state, and segment selection.
 
-**SidePanel** Collapsible section container with tabs for RoutePlanner, RouteComposer,
-SavedRoutes, PathList, Places, and PlaceSearch.
+**SidePanel** Collapsible section container with sections for Places, SavedRoutes,
+RouteComposer, RoutePlanner, and PathList.
 
 **PathMap** Dynamic Leaflet map component with handlers for place creation, segment
-selection, and point picking. Server-side rendering disabled.
+selection, point picking, and path hover tooltips (showing name, distance in km,
+category, surface, and lit status). Server-side rendering disabled.
 
 **RoutePlanner** Form component for generating routes. Manages distance slider, route
 type selection, start/end point picking.
@@ -119,11 +105,12 @@ build custom routes.
 **SavedRoutes** List of user-saved routes with options to load, rename, mark as walked,
 delete, and export.
 
-**Places** List of saved places with options to create, delete, and use as route
-endpoints.
+**Places** List of saved places with options to create (pin on map or search), rename,
+delete, and use as route endpoints. Embeds `PlaceSearch` inline when search mode is
+active.
 
 **PlaceSearch** Search interface for finding addresses and locations via Photon
-geocoding API.
+geocoding API. Embedded within the Places component, not a standalone panel section.
 
 ## State Management
 
@@ -200,27 +187,29 @@ response parsing.
 
 **Regions:**
 
-- `GET /api/regions` - lists all regions grouped by district
-- `POST /api/regions/{id}/favorite` - adds region to user's favorites
-- `DELETE /api/regions/{id}/favorite` - removes region from favorites
+- `GET /api/regions/` - lists all regions grouped by district
+- `POST /api/regions/{id}/favorite/` - adds region to user's favorites
+- `DELETE /api/regions/{id}/favorite/` - removes region from favorites
 
 **Routes:**
 
-- `GET /api/regions/{id}/routes` - lists saved routes in region
-- `POST /api/regions/{id}/routes` - creates new route
-- `PUT /api/routes/{id}` - updates route name or walked status
-- `DELETE /api/routes/{id}` - deletes route
+- `GET /api/regions/{region_id}/routes/saved/` - lists saved routes in region
+- `POST /api/regions/{region_id}/routes/saved/` - creates new route
+- `PATCH /api/regions/{region_id}/routes/saved/{route_id}/` - updates route name or
+  walked status
+- `DELETE /api/regions/{region_id}/routes/saved/{route_id}/` - deletes route
 
 **Paths:**
 
-- `GET /api/regions/{id}/paths` - lists all paths in region
-- `GET /api/regions/{id}/walked-paths` - lists walked paths with coverage percentage
+- `GET /api/regions/{region_id}/paths/` - lists all paths in region
+- `GET /api/regions/{region_id}/paths/walked/` - lists walked paths with coverage counts
 
 **Places:**
 
-- `GET /api/regions/{id}/places` - lists saved places in region
-- `POST /api/regions/{id}/places` - creates new place
-- `DELETE /api/places/{id}` - deletes place
+- `GET /api/regions/{region_id}/places/` - lists saved places in region
+- `POST /api/regions/{region_id}/places/` - creates new place
+- `PATCH /api/regions/{region_id}/places/{place_id}/` - renames a place
+- `DELETE /api/regions/{region_id}/places/{place_id}/` - deletes place
 
 **Geocoding:** Photon API (komoot.io) for address search - no authentication required.
 
@@ -329,12 +318,13 @@ shadcn/ui components (built on Radix UI primitives) located in `src/components/u
 The SidePanel component provides a tabbed interface with collapsible sections for
 different features:
 
-- **Route Planner** - generate walking routes by distance and type
-- **Route Composer** - manually build routes by selecting segments
+- **Places** - manage saved places with integrated search (pin on map or search for
+  addresses)
 - **Saved Routes** - view, manage, and export saved routes
-- **Path List** - browse all paths in the region
-- **Places** - manage saved places
-- **Place Search** - search for addresses and locations
+- **Route Composer** - manually build routes by selecting segments
+- **Route Planner** - generate walking routes by distance and type
+- **Path List** - browse all paths in the region (hover highlights on map, click zooms
+  to path)
 
 Each section uses the Collapsible component from shadcn/ui for expand/collapse
 functionality. Sections maintain independent open/close state. Only one section can be

@@ -5,24 +5,18 @@ points when generating routes.
 
 ## Creating a Place
 
-There are several ways to create a place:
+Click the "+ Place" button in the Places panel. Two options appear:
 
-### From the Map
+### Pin on Map
 
-1. Enable "Show places" in the side panel
-2. Click "Create place" to enter place creation mode
-3. Click a location on the map
-4. Enter a name for the place and confirm
+1. Click "Pin on Map"
+2. Click a location on the map
+3. Enter a name for the place in the dialog and confirm
 
-### From Route Generation
+### Search
 
-When picking a start or end point on the map for route generation, you can choose "Save
-as Place" to save that location for future use.
-
-### From Search
-
-1. Open the place search in the side panel
-2. Search for an address or location name
+1. Click "Search"
+2. An inline search field appears — type an address or location name
 3. Click the save icon next to a search result to create a place at that location
 
 ## Using Places as Route Endpoints
@@ -30,8 +24,13 @@ as Place" to save that location for future use.
 When generating a route, select a saved place from the start or end point dropdown
 instead of picking a point on the map.
 
+## Renaming a Place
+
+Click the edit icon (pencil) next to a place to open a dropdown with "Rename" and
+"Delete" options. Select "Rename", type the new name, and press Enter to confirm.
+
 ## Deleting a Place
 
-Click the delete icon next to a place in the places list to remove it.
+Click the edit icon (pencil) next to a place and select "Delete" from the dropdown.
 
 Place names must be unique within a region for each user.

@@ -16,11 +16,18 @@ Your account is created by an administrator - there is no self-registration.
 
 ## Home Screen
 
-After logging in, you see the home screen with:
+The home page (`/`) redirects to `/explore`, which serves as the main entry point.
 
-- your username in the top-right corner
-- a "Browse regions" button that takes you to the explore page
-- a theme toggle (light/dark mode) in the top-right corner
-- a "Logout" button
+**Unauthenticated:** the explore page displays a login form with the app title and
+a theme toggle (light/dark mode).
 
-Click "Browse regions" to start exploring.
+**Authenticated:** the explore page shows a header bar with:
+
+- a district dropdown to filter regions by administrative district
+- a region selector dropdown (grouped into favorites and other regions)
+- a favorite toggle (star icon) to add or remove the selected region from favorites
+- a walked counter badge showing your progress in the region
+- your username and a "Logout" button
+- a theme toggle (light/dark mode)
+
+Select a region from the dropdown to start exploring.

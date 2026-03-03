@@ -6,31 +6,35 @@ A geographic area defined by a boundary polygon.
 
 **App:** `regions`
 
-| Field        | Type                    | Description                                  |
-| ------------ | ----------------------- | -------------------------------------------- |
-| `code`       | `CharField(50, unique)` | Region identifier in format `{teryt}_{simc}` |
-| `name`       | `CharField(255)`        | Region display name                          |
-| `geometry`   | `MultiPolygonField`     | Region boundary (SRID 4326)                  |
-| `created_at` | `DateTimeField`         | Auto-set on creation                         |
+| Field                          | Type                     | Description                         |
+| ------------------------------ | ------------------------ | ----------------------------------- |
+| `code`                         | `CharField(20, unique)`  | Region identifier (OSM-based code)  |
+| `name`                         | `CharField(255)`         | Region display name                 |
+| `boundary`                     | `MultiPolygonField`      | Region boundary (SRID 4326)         |
+| `administrative_district_lvl_1`| `CharField(100, blank)`  | Top-level administrative district   |
+| `administrative_district_lvl_2`| `CharField(100, blank)`  | Second-level administrative district|
+| `description`                  | `TextField(blank)`       | Region description                  |
+| `created_at`                   | `DateTimeField`          | Auto-set on creation                |
+| `updated_at`                   | `DateTimeField`          | Auto-set on save                    |
 
 **Indexes:** `code`
 
 ## Path
 
-A street or walkable trail, loaded from geoportal data.
+A street or walkable trail, loaded from OSM data.
 
 **App:** `paths`
 
-| Field        | Type                    | Description                          |
-| ------------ | ----------------------- | ------------------------------------ |
-| `region`     | `ForeignKey(Region)`    | Parent region (`CASCADE` on delete)  |
-| `geometry`   | `MultiLineStringField`  | Path geometry (SRID 4326)            |
-| `name`       | `CharField(255, blank)` | Path name (e.g., street name)        |
-| `category`   | `CharField(50)`         | Path category (e.g., `"street"`)     |
-| `surface`    | `CharField(50, blank)`  | Surface type (e.g., `"asphalt"`)     |
-| `accessible` | `BooleanField`          | Accessibility flag (default `False`) |
-| `is_lit`     | `BooleanField`          | Lighting flag (default `False`)      |
-| `created_at` | `DateTimeField`         | Auto-set on creation                 |
+| Field        | Type                                 | Description                                    |
+| ------------ | ------------------------------------ | ---------------------------------------------- |
+| `region`     | `ForeignKey(Region, null, SET_NULL)` | Parent region (nullable, `SET_NULL` on delete) |
+| `geometry`   | `MultiLineStringField`               | Path geometry (SRID 4326)                      |
+| `name`       | `CharField(255, blank)`              | Path name (e.g., street name)                  |
+| `category`   | `CharField(50)`                      | Path category (e.g., `"street"`)               |
+| `surface`    | `CharField(50, blank)`               | Surface type (e.g., `"asphalt"`)               |
+| `accessible` | `BooleanField`                       | Accessibility flag (default `False`)           |
+| `is_lit`     | `BooleanField`                       | Lighting flag (default `False`)                |
+| `created_at` | `DateTimeField`                      | Auto-set on creation                           |
 
 **Indexes:** `region`, `category`
 

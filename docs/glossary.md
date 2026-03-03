@@ -30,7 +30,7 @@ specific endpoints in mind.
 
 ## Path
 
-A street or walkable trail stored in the database, loaded from geoportal data.
+A street or walkable trail stored in the database, loaded from OSM data.
 Represented as a MultiLineString geometry to capture complex road networks and
 multi-segment footpaths. Paths are the raw input data from which routable Segments are
 derived.
@@ -50,10 +50,9 @@ needing to specify exact coordinates repeatedly.
 
 ## Region
 
-A geographic area defined by a boundary polygon, identified by a code in the format
-`{teryt}_{simc}`. All paths, segments, routes, and places belong to a region. Regions
-act as the primary data scope - users favorite regions to access all features within
-them.
+A geographic area defined by a boundary polygon, identified by an OSM-based code. All
+paths, segments, routes, and places belong to a region. Regions act as the primary data
+scope - users favorite regions to access all features within them.
 
 ## Route
 
@@ -80,4 +79,5 @@ compute optimal routes.
 
 A boolean flag on a saved route indicating the user has physically walked it. Walked
 routes contribute to the coverage counter, allowing users to track how much of a region
-they have explored. A user can toggle a route's walked status after completing the walk.
+they have explored. A user can toggle a route's walked status from the saved routes
+list.
