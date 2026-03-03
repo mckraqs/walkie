@@ -4,8 +4,9 @@ You can generate walking routes in any of your favorited regions.
 
 ## Opening the Route Planner
 
-The route planner panel is available on the left side of the explore page when you have
-a favorited region selected.
+The Route Planner panel is available in the side panel when you have a favorited region
+selected. It contains both the route generation form and a "Start Composing" button for
+manual route composition.
 
 ## Setting a Distance
 

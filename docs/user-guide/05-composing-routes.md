@@ -5,8 +5,9 @@ on the map.
 
 ## Starting Compose Mode
 
-Click "Compose" in the side panel to enter compose mode. The map switches to show
-individual segments (street sections between intersections) instead of full paths.
+Click "Start Composing" in the Route Planner panel to enter compose mode. The map
+switches to show individual segments (street sections between intersections) instead of
+full paths.
 
 ## Building Your Route
 

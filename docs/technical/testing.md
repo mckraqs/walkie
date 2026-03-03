@@ -117,7 +117,6 @@ Component tests in `frontend/src/components/__tests__/`:
 - `PathList.test.tsx`
 - `PlaceNameDialog.test.tsx`
 - `Places.test.tsx`
-- `RouteComposer.test.tsx`
 - `RoutePlanner.test.tsx`
 - `SavedRoutes.test.tsx`
 - `Select.test.tsx`

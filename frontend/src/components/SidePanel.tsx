@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import SavedRoutes from "@/components/SavedRoutes";
 import RoutePlanner from "@/components/RoutePlanner";
 import Places from "@/components/Places";
-import RouteComposer from "@/components/RouteComposer";
 import PathList from "@/components/PathList";
 import { Button } from "@/components/ui/button";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
@@ -75,13 +74,12 @@ export function computeSectionHeight(
   savedRoutesCollapsed: boolean,
   routePlannerCollapsed: boolean,
   placesCollapsed: boolean,
-  composerCollapsed: boolean,
   pathListCollapsed: boolean,
   isCollapsed: boolean,
 ): string {
-  const sections = [savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed];
+  const sections = [savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed];
   const collapsedCount = sections.filter(Boolean).length;
-  const expandedCount = 5 - collapsedCount;
+  const expandedCount = 4 - collapsedCount;
 
   if (isCollapsed) {
     return HEADER;
@@ -147,36 +145,25 @@ export default function SidePanel({
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(true);
   const [placesCollapsed, setPlacesCollapsed] = useState(true);
-  const [composerCollapsed, setComposerCollapsed] = useState(false);
   const [pathListCollapsed, setPathListCollapsed] = useState(true);
 
   useEffect(() => {
     if (composing) {
-      setRoutePlannerCollapsed(true);
       setSavedRoutesCollapsed(true);
     }
   }, [composing]);
 
-  useEffect(() => {
-    if (route !== null) {
-      setComposerCollapsed(true);
-    }
-  }, [route]);
-
   const savedRoutesHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, savedRoutesCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, savedRoutesCollapsed)
     : "0";
   const rpHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, routePlannerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, routePlannerCollapsed)
     : "0";
   const placesHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, placesCollapsed)
-    : "0";
-  const composerHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, composerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, placesCollapsed)
     : "0";
   const pathListHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, composerCollapsed, pathListCollapsed, pathListCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, pathListCollapsed)
     : "0";
 
   return (
@@ -233,22 +220,6 @@ export default function SidePanel({
                 onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
                 height={savedRoutesHeight}
               />
-              <RouteComposer
-                isFavorite={isFavorite}
-                composing={composing}
-                onStartComposing={onStartComposing}
-                onStopComposing={onStopComposing}
-                selectedSegmentCount={selectedSegmentCount}
-                composedTotalDistance={composedTotalDistance}
-                composedIsLoop={composedIsLoop}
-                onUndoLast={onUndoLastSegment}
-                onClearAll={onClearAllSegments}
-                onSaveRoute={onSaveComposedRoute}
-                composerError={composerError}
-                collapsed={composerCollapsed}
-                onToggleCollapsed={() => setComposerCollapsed((c) => !c)}
-                height={composerHeight}
-              />
               <RoutePlanner
                 route={route}
                 loading={loading}
@@ -267,6 +238,16 @@ export default function SidePanel({
                 onPickPointOnMap={onPickPointOnMap}
                 onClearTempPoint={onClearTempPoint}
                 autoSelectPlace={autoSelectPlace}
+                composing={composing}
+                onStartComposing={onStartComposing}
+                onStopComposing={onStopComposing}
+                selectedSegmentCount={selectedSegmentCount}
+                composedTotalDistance={composedTotalDistance}
+                composedIsLoop={composedIsLoop}
+                onUndoLastSegment={onUndoLastSegment}
+                onClearAllSegments={onClearAllSegments}
+                onSaveComposedRoute={onSaveComposedRoute}
+                composerError={composerError}
               />
               <PathList
                 paths={paths}

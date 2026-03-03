@@ -59,7 +59,6 @@ RootLayout
             SidePanel
               Places (embeds PlaceSearch)
               SavedRoutes
-              RouteComposer
               RoutePlanner
               PathList
             PathMap (dynamic import, SSR disabled)
@@ -90,17 +89,16 @@ authenticated, manages region state and distributes it to child components.
 data, composing state, and segment selection.
 
 **SidePanel** Collapsible section container with sections for Places, SavedRoutes,
-RouteComposer, RoutePlanner, and PathList.
+RoutePlanner, and PathList.
 
 **PathMap** Dynamic Leaflet map component with handlers for place creation, segment
 selection, point picking, and path hover tooltips (showing name, distance in km,
 category, surface, and lit status). Server-side rendering disabled.
 
-**RoutePlanner** Form component for generating routes. Manages distance slider, route
-type selection, start/end point picking.
-
-**RouteComposer** Interface for manually selecting and connecting segments on the map to
-build custom routes.
+**RoutePlanner** Unified panel for route generation and manual composition. In initial
+mode, shows the generation form (distance, route type, start/end points) and a "Start
+Composing" button. In composing mode, shows segment stats, undo/clear controls, and
+save flow. In results mode, shows generated route details with save/download/clear.
 
 **SavedRoutes** List of user-saved routes with options to load, rename, mark as walked,
 delete, and export.
@@ -321,8 +319,8 @@ different features:
 - **Places** - manage saved places with integrated search (pin on map or search for
   addresses)
 - **Saved Routes** - view, manage, and export saved routes
-- **Route Composer** - manually build routes by selecting segments
-- **Route Planner** - generate walking routes by distance and type
+- **Route Planner** - generate walking routes or manually compose routes by selecting
+  segments (switches between generation form, composing mode, and results mode)
 - **Path List** - browse all paths in the region (hover highlights on map, click zooms
   to path)
 
