@@ -58,7 +58,7 @@ interface PathMapProps {
 
 const PATH_STYLE: PathOptions = {
   color: "#3b82f6",
-  weight: 4,
+  weight: 3,
   opacity: 1,
 };
 
@@ -70,31 +70,31 @@ const PATH_DIMMED_STYLE: PathOptions = {
 
 const HOVER_STYLE: PathOptions = {
   color: "#1d4ed8",
-  weight: 5,
+  weight: 4,
   opacity: 1,
 };
 
 const WALKED_STYLE: PathOptions = {
   color: "#059669",
-  weight: 4,
+  weight: 3,
   opacity: 0.9,
 };
 
 const WALKED_HOVER_STYLE: PathOptions = {
   color: "#047857",
-  weight: 6,
+  weight: 5,
   opacity: 1,
 };
 
 const WALKED_HIGHLIGHT_STYLE: PathOptions = {
   color: "#059669",
-  weight: 5,
+  weight: 4,
   opacity: 1.0,
 };
 
 const UNWALKED_DIMMED_STYLE: PathOptions = {
   color: "#60a5fa",
-  weight: 3,
+  weight: 2,
   opacity: 0.8,
 };
 
