@@ -11,7 +11,6 @@ describe("PathList", () => {
       makePathFeature({ id: 2, properties: { name: "Oak Avenue", category: "cycleway", surface: "gravel", accessible: true, is_lit: true, created_at: "" } }),
     ],
     walkedPathIds: new Set([1]),
-    showWalkedOnly: false,
     hoveredPathId: null,
     onPathHover: vi.fn(),
     collapsed: false,
@@ -24,13 +23,6 @@ describe("PathList", () => {
 
     expect(screen.getByText("Main Street")).toBeInTheDocument();
     expect(screen.getByText("Oak Avenue")).toBeInTheDocument();
-  });
-
-  it("filters to walked-only when showWalkedOnly is true", () => {
-    render(<PathList {...defaultProps} showWalkedOnly={true} />);
-
-    expect(screen.getByText("Main Street")).toBeInTheDocument();
-    expect(screen.queryByText("Oak Avenue")).not.toBeInTheDocument();
   });
 
   it("shows empty message when no paths to display", () => {

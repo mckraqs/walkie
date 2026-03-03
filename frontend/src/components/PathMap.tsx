@@ -46,7 +46,6 @@ interface PathMapProps {
   composerError?: string | null;
   composedStartPoint?: [number, number] | null;
   composedEndPoint?: [number, number] | null;
-  showWalkedOnly?: boolean;
   pickingPoint?: "start" | "end" | null;
   onPickPoint?: (coords: [number, number]) => void;
   startTempPoint?: TempPoint | null;
@@ -72,12 +71,6 @@ const HOVER_STYLE: PathOptions = {
   color: "#1d4ed8",
   weight: 4,
   opacity: 1,
-};
-
-const WALKED_STYLE: PathOptions = {
-  color: "#059669",
-  weight: 3,
-  opacity: 0.9,
 };
 
 const WALKED_HOVER_STYLE: PathOptions = {
@@ -598,7 +591,6 @@ export default function PathMap({
   composerError,
   composedStartPoint,
   composedEndPoint,
-  showWalkedOnly,
   pickingPoint,
   onPickPoint,
   startTempPoint,
@@ -704,8 +696,8 @@ export default function PathMap({
   onSegmentClickRef.current = onSegmentClick;
   const selectedSegmentIdsRef = useRef(selectedSegmentIds);
   selectedSegmentIdsRef.current = selectedSegmentIds;
-  const showWalkedOnlyRef = useRef(showWalkedOnly);
-  showWalkedOnlyRef.current = showWalkedOnly;
+  const isFavoriteRef = useRef(isFavorite);
+  isFavoriteRef.current = isFavorite;
   const composingRef = useRef(composing);
   composingRef.current = composing;
   const showPlacesRef = useRef(showPlaces);
@@ -732,9 +724,9 @@ export default function PathMap({
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
     if (showPlacesRef.current) return UNWALKED_DIMMED_STYLE;
     const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
-    if (showWalkedOnlyRef.current && walked) return WALKED_HIGHLIGHT_STYLE;
-    if (showWalkedOnlyRef.current && !walked) return UNWALKED_DIMMED_STYLE;
-    if (walked) return WALKED_STYLE;
+    if (isFavoriteRef.current) {
+      return walked ? WALKED_HIGHLIGHT_STYLE : UNWALKED_DIMMED_STYLE;
+    }
     return PATH_STYLE;
   }
 
@@ -773,7 +765,7 @@ export default function PathMap({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walkedPathIds, hasRoute, showWalkedOnly, showPlaces]);
+  }, [walkedPathIds, hasRoute, isFavorite, showPlaces]);
 
   // External hover drives style (highlight all siblings)
   useEffect(() => {

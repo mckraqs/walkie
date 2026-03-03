@@ -47,7 +47,6 @@ interface SidePanelProps {
   composerError: string | null;
   paths: PathFeature[];
   walkedPathIds: Set<number>;
-  showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
   startTempPoint: TempPoint | null;
@@ -121,7 +120,6 @@ export default function SidePanel({
   composerError,
   paths,
   walkedPathIds,
-  showWalkedOnly,
   hoveredPathId,
   onPathHover,
   startTempPoint,
@@ -254,7 +252,6 @@ export default function SidePanel({
           <PathList
             paths={paths}
             walkedPathIds={walkedPathIds}
-            showWalkedOnly={showWalkedOnly}
             hoveredPathId={hoveredPathId}
             onPathHover={onPathHover}
             collapsed={pathListCollapsed}

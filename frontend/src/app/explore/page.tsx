@@ -57,8 +57,6 @@ export default function ExplorePage() {
   const [walkedPathIds, setWalkedPathIds] = useState<number[]>([]);
   const [totalPaths, setTotalPaths] = useState(0);
   const [walkedCount, setWalkedCount] = useState(0);
-  const [showWalkedOnly, setShowWalkedOnly] = useState(false);
-
   const [places, setPlaces] = useState<Place[]>([]);
   const [showPlaces, setShowPlaces] = useState(false);
   const [isCreatingPlace, setIsCreatingPlace] = useState(false);
@@ -111,7 +109,6 @@ export default function ExplorePage() {
         setWalkedPathIds([]);
         setTotalPaths(0);
         setWalkedCount(0);
-        setShowWalkedOnly(false);
       });
       return;
     }
@@ -394,18 +391,6 @@ export default function ExplorePage() {
           )}
           {selectedRegionId && isFavorite && (
             <>
-              <Button
-                variant={showWalkedOnly ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowWalkedOnly((v) => !v)}
-                className={
-                  showWalkedOnly
-                    ? "border-green-600 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-500 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
-                    : ""
-                }
-              >
-                Walked
-              </Button>
               <Badge variant="secondary">
                 {walkedCount}/{totalPaths}{" "}
                 ({totalPaths > 0 ? ((walkedCount / totalPaths) * 100).toFixed(1) : "0.0"}%)
@@ -458,7 +443,6 @@ export default function ExplorePage() {
             paths={paths}
             isFavorite={isFavorite}
             walkedPathIds={new Set(walkedPathIds)}
-            showWalkedOnly={showWalkedOnly}
             onWalkedChange={handleWalkedChange}
             places={places}
             showPlaces={showPlaces}

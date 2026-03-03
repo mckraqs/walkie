@@ -7,7 +7,6 @@ import type { PathFeature } from "@/types/geo";
 interface PathListProps {
   paths: PathFeature[];
   walkedPathIds: Set<number>;
-  showWalkedOnly: boolean;
   hoveredPathId: number | null;
   onPathHover: (pathId: number | null) => void;
 
@@ -19,18 +18,13 @@ interface PathListProps {
 export default function PathList({
   paths,
   walkedPathIds,
-  showWalkedOnly,
   hoveredPathId,
   onPathHover,
   collapsed,
   onToggleCollapsed,
   height,
 }: PathListProps) {
-  const visiblePaths = showWalkedOnly
-    ? paths.filter((p) => walkedPathIds.has(p.id))
-    : paths;
-
-  const deduplicatedPaths = visiblePaths.filter((path, index, arr) => {
+  const deduplicatedPaths = paths.filter((path, index, arr) => {
     if (!path.properties.name) return true;
     return (
       arr.findIndex((p) => p.properties.name === path.properties.name) === index

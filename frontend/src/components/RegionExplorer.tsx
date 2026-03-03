@@ -42,7 +42,6 @@ interface RegionExplorerProps {
   paths: PathFeatureCollection;
   isFavorite: boolean;
   walkedPathIds: Set<number>;
-  showWalkedOnly: boolean;
   onWalkedChange: (walkedPathIds: number[], totalPaths: number, walkedCount: number) => void;
   places: Place[];
   showPlaces: boolean;
@@ -64,7 +63,6 @@ export default function RegionExplorer({
   paths,
   isFavorite,
   walkedPathIds,
-  showWalkedOnly,
   onWalkedChange,
   places,
   showPlaces,
@@ -497,14 +495,6 @@ export default function RegionExplorer({
     }
   }, [route]);
 
-  const displayedPaths = useMemo<PathFeatureCollection>(() => {
-    if (!showWalkedOnly) return paths;
-    return {
-      type: "FeatureCollection",
-      features: paths.features.filter((f) => walkedPathIds.has(f.id)),
-    };
-  }, [paths, showWalkedOnly, walkedPathIds]);
-
   return (
     <div className="relative h-full">
       <SidePanel
@@ -533,9 +523,8 @@ export default function RegionExplorer({
         onClearAllSegments={handleClearAllSegments}
         onSaveComposedRoute={handleSaveComposedRoute}
         composerError={composerError}
-        paths={displayedPaths.features}
+        paths={paths.features}
         walkedPathIds={walkedPathIds}
-        showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
         startTempPoint={startTempPoint}
@@ -561,7 +550,6 @@ export default function RegionExplorer({
         region={region}
         paths={paths}
         route={route}
-        showWalkedOnly={showWalkedOnly}
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
         walkedPathIds={walkedPathIds}
