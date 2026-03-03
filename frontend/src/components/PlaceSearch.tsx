@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { searchGeocoding } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -81,8 +81,17 @@ export default function PlaceSearch({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search address or place..."
-          className="h-8 text-xs"
+          className="h-8 pr-7 text-xs"
         />
+        {query.length > 0 && !loading && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
         {loading && (
           <Loader2 className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
         )}
