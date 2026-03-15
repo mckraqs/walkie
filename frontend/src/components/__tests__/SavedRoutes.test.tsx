@@ -47,12 +47,6 @@ describe("SavedRoutes", () => {
     expect(screen.getByText("Loop")).toBeInTheDocument();
   });
 
-  it("shows Custom badge for custom routes", () => {
-    render(<SavedRoutes {...defaultProps} />);
-
-    expect(screen.getByText("Custom")).toBeInTheDocument();
-  });
-
   it("loads route on click", async () => {
     const user = userEvent.setup();
     render(<SavedRoutes {...defaultProps} />);
@@ -73,8 +67,9 @@ describe("SavedRoutes", () => {
     const user = userEvent.setup();
     render(<SavedRoutes {...defaultProps} />);
 
-    const renameButtons = screen.getAllByTitle("Rename");
-    await user.click(renameButtons[0]);
+    const actionsButtons = screen.getAllByTitle("Actions");
+    await user.click(actionsButtons[0]);
+    await user.click(screen.getByText("Rename"));
 
     const input = screen.getByDisplayValue("Morning Walk");
     await user.clear(input);
@@ -89,8 +84,9 @@ describe("SavedRoutes", () => {
     const user = userEvent.setup();
     render(<SavedRoutes {...defaultProps} />);
 
-    const renameButtons = screen.getAllByTitle("Rename");
-    await user.click(renameButtons[0]);
+    const actionsButtons = screen.getAllByTitle("Actions");
+    await user.click(actionsButtons[0]);
+    await user.click(screen.getByText("Rename"));
 
     const input = screen.getByDisplayValue("Morning Walk");
     await user.keyboard("{Escape}");
@@ -103,8 +99,9 @@ describe("SavedRoutes", () => {
     const user = userEvent.setup();
     render(<SavedRoutes {...defaultProps} />);
 
-    const deleteButtons = screen.getAllByTitle("Delete");
-    await user.click(deleteButtons[0]);
+    const actionsButtons = screen.getAllByTitle("Actions");
+    await user.click(actionsButtons[0]);
+    await user.click(screen.getByText("Delete"));
 
     expect(defaultProps.onDeleteRoute).toHaveBeenCalledWith(1);
   });

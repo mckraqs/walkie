@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2, Check, X } from "lucide-react";
+import { Pencil, Check, X } from "lucide-react";
 import { downloadRouteFile } from "@/lib/gpx";
 import { formatDistance } from "@/lib/geo";
 import CollapsibleSection from "@/components/collapsible-section";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -116,15 +122,6 @@ export default function SavedRoutes({
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <Checkbox
-                    checked={route.walked}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleWalked(route.id);
-                    }}
-                    className="h-3.5 w-3.5 shrink-0"
-                    title={route.walked ? "Mark as not walked" : "Mark as walked"}
-                  />
                   {renamingId === route.id ? (
                     <div className="flex flex-1 items-center gap-1">
                       <Input
@@ -163,25 +160,39 @@ export default function SavedRoutes({
                       <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
                         {route.name}
                       </span>
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); startRename(route); }}
-                          className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-                          title="Rename"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(route.id); }}
-                          disabled={deletingId === route.id}
-                          className="rounded p-0.5 text-muted-foreground hover:text-destructive"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+                      <Checkbox
+                        checked={route.walked}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleWalked(route.id);
+                        }}
+                        className="h-3.5 w-3.5 shrink-0"
+                        title={route.walked ? "Mark as not walked" : "Mark as walked"}
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                            className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                            title="Actions"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => startRename(route)}>
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(route.id)}
+                            disabled={deletingId === route.id}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </>
                   )}
                 </div>
@@ -190,11 +201,6 @@ export default function SavedRoutes({
                   {route.is_loop && (
                     <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                       Loop
-                    </Badge>
-                  )}
-                  {route.is_custom && (
-                    <Badge variant="secondary" className="px-1 py-0 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-                      Custom
                     </Badge>
                   )}
                 </div>
