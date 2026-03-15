@@ -39,7 +39,6 @@ import type {
 } from "@/types/geo";
 
 const NO_DISTRICT = "__all__";
-const NO_REGION = "__none__";
 
 export default function ExplorePage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -209,7 +208,7 @@ export default function ExplorePage() {
   }
 
   function handleRegionChange(value: string) {
-    setSelectedRegionId(value === NO_REGION ? "" : value);
+    setSelectedRegionId(value);
   }
 
   function buildUnfavoriteMessage(routeCount: number, placeCount: number): string {
@@ -340,16 +339,13 @@ export default function ExplorePage() {
             </SelectContent>
           </Select>
           <Select
-            value={selectedRegionId || NO_REGION}
+            value={selectedRegionId || ""}
             onValueChange={handleRegionChange}
           >
             <SelectTrigger className="h-9 w-auto min-w-[180px]">
               <SelectValue placeholder="Select a region..." />
             </SelectTrigger>
             <SelectContent position="popper">
-              {!selectedRegionId && (
-                <SelectItem value={NO_REGION}>Select a region...</SelectItem>
-              )}
               {filteredRegions.currentlySelected.length > 0 && (
                 <SelectGroup>
                   <SelectLabel>Currently selected</SelectLabel>
@@ -362,7 +358,7 @@ export default function ExplorePage() {
               )}
               {filteredRegions.favorites.length > 0 && (
                 <SelectGroup>
-                  <SelectLabel>Favorites</SelectLabel>
+                  <SelectLabel>Favorite Regions</SelectLabel>
                   {filteredRegions.favorites.map((r) => (
                     <SelectItem key={r.id} value={String(r.id)}>
                       {r.name}
@@ -372,7 +368,7 @@ export default function ExplorePage() {
               )}
               {filteredRegions.others.length > 0 && (
                 <SelectGroup>
-                  <SelectLabel>Other regions</SelectLabel>
+                  <SelectLabel>Other Regions</SelectLabel>
                   {filteredRegions.others.map((r) => (
                     <SelectItem key={r.id} value={String(r.id)}>
                       {r.name}
