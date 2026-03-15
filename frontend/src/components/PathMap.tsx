@@ -33,6 +33,7 @@ interface PathMapProps {
   hoveredPathId?: number | null;
   onPathHover?: (pathId: number | null) => void;
   walkedPathIds?: Set<number>;
+  partiallyWalkedPathIds?: Set<number>;
   isFavorite?: boolean;
   places?: Place[];
   isCreatingPlace?: boolean;
@@ -663,6 +664,7 @@ export default function PathMap({
   hoveredPathId,
   onPathHover,
   walkedPathIds,
+  partiallyWalkedPathIds,
   isFavorite,
   places,
   isCreatingPlace,
@@ -771,6 +773,8 @@ export default function PathMap({
   // Refs to avoid stale closures in onEachFeature callbacks
   const walkedPathIdsRef = useRef(walkedPathIds);
   walkedPathIdsRef.current = walkedPathIds;
+  const partiallyWalkedPathIdsRef = useRef(partiallyWalkedPathIds);
+  partiallyWalkedPathIdsRef.current = partiallyWalkedPathIds;
   const hasRouteRef = useRef(hasRoute);
   hasRouteRef.current = hasRoute;
   const onPathHoverRef = useRef(onPathHover);
@@ -814,18 +818,18 @@ export default function PathMap({
 
   function getHoverStyle(pathId: number): PathOptions {
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
-    const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
-    if (walked) return WALKED_HOVER_STYLE;
+    const partiallyWalked = partiallyWalkedPathIdsRef.current?.has(pathId) ?? false;
+    if (partiallyWalked) return WALKED_HOVER_STYLE;
     return HOVER_STYLE;
   }
 
-  function setSiblingsStyle(pathId: number, style: PathOptions) {
+  function setSiblingsHoverStyle(pathId: number) {
     const siblings = siblingIdsMapRef.current.get(pathId);
     if (!siblings) return;
     for (const sid of siblings) {
       if (sid === pathId) continue;
       const layer = layerMapRef.current.get(sid);
-      if (layer) layer.setStyle(style);
+      if (layer) layer.setStyle(getHoverStyle(sid));
     }
   }
 
@@ -858,7 +862,7 @@ export default function PathMap({
     const hoverStyle = getHoverStyle(hoveredPathId);
     layer.setStyle(hoverStyle);
     layer.bringToFront();
-    setSiblingsStyle(hoveredPathId, hoverStyle);
+    setSiblingsHoverStyle(hoveredPathId);
 
     // Show tooltip at path center (favorite only, from list hover)
     if (isFavorite && hoveredPathIdRef.current !== hoveredPathId && mapRef.current) {
@@ -983,7 +987,7 @@ export default function PathMap({
                   clearTimeout(hideTimerRef.current);
                   hoveredPathIdRef.current = pathId;
                   (e.target as L.Path).setStyle(getHoverStyle(pathId));
-                  setSiblingsStyle(pathId, getHoverStyle(pathId));
+                  setSiblingsHoverStyle(pathId);
                   onPathHoverRef.current?.(pathId);
                   const containerPoint = (
                     e as L.LeafletMouseEvent

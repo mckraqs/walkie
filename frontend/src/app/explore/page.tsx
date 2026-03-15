@@ -54,6 +54,7 @@ export default function ExplorePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [walkedPathIds, setWalkedPathIds] = useState<number[]>([]);
+  const [partiallyWalkedPathIds, setPartiallyWalkedPathIds] = useState<number[]>([]);
   const [totalPaths, setTotalPaths] = useState(0);
   const [walkedCount, setWalkedCount] = useState(0);
   const [places, setPlaces] = useState<Place[]>([]);
@@ -99,6 +100,7 @@ export default function ExplorePage() {
     if (!selectedRegionId || !user || !isFavorite) {
       Promise.resolve().then(() => {
         setWalkedPathIds([]);
+        setPartiallyWalkedPathIds([]);
         setTotalPaths(0);
         setWalkedCount(0);
       });
@@ -107,11 +109,13 @@ export default function ExplorePage() {
     fetchWalkedPaths(selectedRegionId)
       .then((data) => {
         setWalkedPathIds(data.walked_path_ids);
+        setPartiallyWalkedPathIds(data.partially_walked_path_ids);
         setTotalPaths(data.total_paths);
         setWalkedCount(data.walked_count);
       })
       .catch(() => {
         setWalkedPathIds([]);
+        setPartiallyWalkedPathIds([]);
         setTotalPaths(0);
         setWalkedCount(0);
       });
@@ -129,8 +133,9 @@ export default function ExplorePage() {
       .catch(() => setPlaces([]));
   }, [selectedRegionId, user, isFavorite]);
 
-  const handleWalkedChange = useCallback((newWalkedPathIds: number[], newTotalPaths: number, newWalkedCount: number) => {
+  const handleWalkedChange = useCallback((newWalkedPathIds: number[], newPartiallyWalkedPathIds: number[], newTotalPaths: number, newWalkedCount: number) => {
     setWalkedPathIds(newWalkedPathIds);
+    setPartiallyWalkedPathIds(newPartiallyWalkedPathIds);
     setTotalPaths(newTotalPaths);
     setWalkedCount(newWalkedCount);
   }, []);
@@ -257,11 +262,13 @@ export default function ExplorePage() {
       fetchWalkedPaths(selectedRegionId)
         .then((data) => {
           setWalkedPathIds(data.walked_path_ids);
+          setPartiallyWalkedPathIds(data.partially_walked_path_ids);
           setTotalPaths(data.total_paths);
           setWalkedCount(data.walked_count);
         })
         .catch(() => {
           setWalkedPathIds([]);
+          setPartiallyWalkedPathIds([]);
           setTotalPaths(0);
           setWalkedCount(0);
         });
@@ -443,6 +450,7 @@ export default function ExplorePage() {
             paths={paths}
             isFavorite={isFavorite}
             walkedPathIds={new Set(walkedPathIds)}
+            partiallyWalkedPathIds={new Set(partiallyWalkedPathIds)}
             onWalkedChange={handleWalkedChange}
             places={places}
             placeCreationMode={placeCreationMode}

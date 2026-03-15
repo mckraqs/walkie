@@ -995,9 +995,11 @@ class TestRouteListCreateView:
         data = response.json()
         assert data["walked"] is True
         assert "walked_path_ids" in data
+        assert "partially_walked_path_ids" in data
         assert "total_paths" in data
         assert "walked_count" in data
         assert isinstance(data["walked_path_ids"], list)
+        assert isinstance(data["partially_walked_path_ids"], list)
 
         route = Route.objects.get(pk=data["id"])
         assert route.walked is True
@@ -1031,6 +1033,7 @@ class TestRouteListCreateView:
         data = response.json()
         assert data["walked"] is False
         assert "walked_path_ids" not in data
+        assert "partially_walked_path_ids" not in data
         assert "total_paths" not in data
         assert "walked_count" not in data
 

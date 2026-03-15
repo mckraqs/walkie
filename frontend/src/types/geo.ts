@@ -111,6 +111,7 @@ export interface RouteResponse {
 
 export interface WalkedPathsResponse {
   walked_path_ids: number[];
+  partially_walked_path_ids: number[];
   total_paths: number;
   walked_count: number;
 }
@@ -153,6 +154,7 @@ export interface RouteWalkToggleResponse {
   id: number;
   walked: boolean;
   walked_path_ids: number[];
+  partially_walked_path_ids: number[];
   total_paths: number;
   walked_count: number;
 }
@@ -170,6 +172,7 @@ export interface SaveRouteRequest {
 
 export interface SaveRouteResponse extends RouteListItem {
   walked_path_ids?: number[];
+  partially_walked_path_ids?: number[];
   total_paths?: number;
   walked_count?: number;
 }

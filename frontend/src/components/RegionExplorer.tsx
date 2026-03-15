@@ -42,7 +42,8 @@ interface RegionExplorerProps {
   paths: PathFeatureCollection;
   isFavorite: boolean;
   walkedPathIds: Set<number>;
-  onWalkedChange: (walkedPathIds: number[], totalPaths: number, walkedCount: number) => void;
+  partiallyWalkedPathIds: Set<number>;
+  onWalkedChange: (walkedPathIds: number[], partiallyWalkedPathIds: number[], totalPaths: number, walkedCount: number) => void;
   places: Place[];
   placeCreationMode: "pin" | "search" | null;
   pendingPlaceLocation: [number, number] | null;
@@ -61,6 +62,7 @@ export default function RegionExplorer({
   paths,
   isFavorite,
   walkedPathIds,
+  partiallyWalkedPathIds,
   onWalkedChange,
   places,
   placeCreationMode,
@@ -155,7 +157,7 @@ export default function RegionExplorer({
       const saved = await saveRoute(regionId, request);
       setSavedRoutes((prev) => [saved, ...prev]);
       if (saved.walked && saved.walked_path_ids) {
-        onWalkedChange(saved.walked_path_ids, saved.total_paths!, saved.walked_count!);
+        onWalkedChange(saved.walked_path_ids, saved.partially_walked_path_ids ?? [], saved.total_paths!, saved.walked_count!);
       }
     },
     [regionId, onWalkedChange],
@@ -257,7 +259,7 @@ export default function RegionExplorer({
         setSavedRoutes((prev) =>
           prev.map((r) => (r.id === result.id ? { ...r, walked: result.walked } : r)),
         );
-        onWalkedChange(result.walked_path_ids, result.total_paths, result.walked_count);
+        onWalkedChange(result.walked_path_ids, result.partially_walked_path_ids, result.total_paths, result.walked_count);
       } catch {
         // Silently handle
       }
@@ -532,7 +534,7 @@ export default function RegionExplorer({
       const saved = await saveRoute(regionId, fullRequest);
       setSavedRoutes((prev) => [saved, ...prev]);
       if (saved.walked && saved.walked_path_ids) {
-        onWalkedChange(saved.walked_path_ids, saved.total_paths!, saved.walked_count!);
+        onWalkedChange(saved.walked_path_ids, saved.partially_walked_path_ids ?? [], saved.total_paths!, saved.walked_count!);
       }
     },
     [regionId, selectedSegmentIds, composedTotalDistance, composedIsLoop, composedStartPoint, composedEndPoint, onWalkedChange],
@@ -607,6 +609,7 @@ export default function RegionExplorer({
         hoveredPathId={hoveredPathId}
         onPathHover={setHoveredPathId}
         walkedPathIds={walkedPathIds}
+        partiallyWalkedPathIds={partiallyWalkedPathIds}
         isFavorite={isFavorite}
         places={places}
         isCreatingPlace={placeCreationMode === "pin"}

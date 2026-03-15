@@ -109,6 +109,7 @@ class TestGetWalkedPathIds:
 
         assert response.status_code == 200
         assert response.json()["walked_path_ids"] == []
+        assert response.json()["partially_walked_path_ids"] == []
 
     def test_route_covers_all_segments(
         self,
@@ -136,6 +137,7 @@ class TestGetWalkedPathIds:
 
         assert response.status_code == 200
         assert path.pk in response.json()["walked_path_ids"]
+        assert path.pk in response.json()["partially_walked_path_ids"]
 
     def test_route_covers_at_least_half(
         self,
@@ -197,7 +199,10 @@ class TestGetWalkedPathIds:
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
         assert response.status_code == 200
-        assert path.pk not in response.json()["walked_path_ids"]
+        data = response.json()
+        assert path.pk not in data["walked_path_ids"]
+        # Below 50% threshold but has some walked coverage
+        assert path.pk in data["partially_walked_path_ids"]
 
     def test_multiple_routes_aggregate_segments(
         self,
@@ -373,9 +378,14 @@ class TestGetWalkedPathIds:
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
-        walked = response.json()["walked_path_ids"]
+        data = response.json()
+        walked = data["walked_path_ids"]
         assert path_a.pk not in walked
         assert path_b.pk not in walked
+        # path_a has walked coverage (its segment was walked)
+        assert path_a.pk in data["partially_walked_path_ids"]
+        # path_b has no walked segments
+        assert path_b.pk not in data["partially_walked_path_ids"]
 
     def test_unnamed_paths_evaluated_individually(
         self,
@@ -442,7 +452,10 @@ class TestGetWalkedPathIds:
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
         assert response.status_code == 200
-        assert path.pk not in response.json()["walked_path_ids"]
+        data = response.json()
+        assert path.pk not in data["walked_path_ids"]
+        # Has some walked coverage despite being below 50% threshold
+        assert path.pk in data["partially_walked_path_ids"]
 
     def test_total_paths_counts_unique_names(
         self,
@@ -493,4 +506,6 @@ class TestWalkedPathsListView:
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
 
         assert response.status_code == 200
-        assert response.json()["total_paths"] == 2
+        data = response.json()
+        assert data["total_paths"] == 2
+        assert "partially_walked_path_ids" in data

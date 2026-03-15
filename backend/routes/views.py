@@ -235,6 +235,9 @@ class RouteListCreateView(APIView):
         if route.walked:
             result = _get_walked_paths(request.user, region)
             response_data["walked_path_ids"] = result.path_ids
+            response_data["partially_walked_path_ids"] = (
+                result.partially_walked_path_ids
+            )
             response_data["total_paths"] = result.total_count
             response_data["walked_count"] = result.walked_count
         return Response(response_data, status=status.HTTP_201_CREATED)
@@ -362,6 +365,7 @@ class RouteWalkToggleView(APIView):
                 "id": route.id,
                 "walked": route.walked,
                 "walked_path_ids": result.path_ids,
+                "partially_walked_path_ids": result.partially_walked_path_ids,
                 "total_paths": result.total_count,
                 "walked_count": result.walked_count,
             }

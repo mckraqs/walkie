@@ -183,10 +183,14 @@ class FavoriteRegionToggleView(APIView):
 class WalkedPathsResult:
     """Result of the walked-paths coverage calculation."""
 
-    __slots__ = ("path_ids", "total_count", "walked_count")
+    __slots__ = ("partially_walked_path_ids", "path_ids", "total_count", "walked_count")
 
     def __init__(
-        self, path_ids: list[int], walked_count: int, total_count: int
+        self,
+        path_ids: list[int],
+        walked_count: int,
+        total_count: int,
+        partially_walked_path_ids: list[int] | None = None,
     ) -> None:
         """Initialize with path IDs and progress counts.
 
@@ -194,10 +198,13 @@ class WalkedPathsResult:
             path_ids: Individual path record IDs for map highlighting.
             walked_count: Unique walked street names plus unnamed paths.
             total_count: Unique street names plus unnamed paths in region.
+            partially_walked_path_ids: Path IDs with any walked segment
+                coverage, regardless of threshold.
         """
         self.path_ids = path_ids
         self.walked_count = walked_count
         self.total_count = total_count
+        self.partially_walked_path_ids = partially_walked_path_ids or []
 
 
 def _get_walked_paths(user: object, region: Region) -> WalkedPathsResult:
@@ -235,7 +242,12 @@ def _get_walked_paths(user: object, region: Region) -> WalkedPathsResult:
         walked_segment_ids.update(route.segment_ids)
 
     if not walked_segment_ids:
-        return WalkedPathsResult(path_ids=[], walked_count=0, total_count=total_count)
+        return WalkedPathsResult(
+            path_ids=[],
+            walked_count=0,
+            total_count=total_count,
+            partially_walked_path_ids=[],
+        )
 
     segment_length = _GeographyLength("segment__geometry")
 
@@ -282,10 +294,20 @@ def _get_walked_paths(user: object, region: Region) -> WalkedPathsResult:
     )
     unnamed_ids = [row["path_id"] for row in unnamed_coverage]
 
+    partially_walked_ids = list(
+        PathSegment.objects.filter(
+            path__region=region,
+            segment_id__in=walked_segment_ids,
+        )
+        .values_list("path_id", flat=True)
+        .distinct()
+    )
+
     return WalkedPathsResult(
         path_ids=sorted(set(named_ids) | set(unnamed_ids)),
         walked_count=len(walked_names) + len(unnamed_ids),
         total_count=total_count,
+        partially_walked_path_ids=sorted(partially_walked_ids),
     )
 
 
@@ -312,6 +334,7 @@ class WalkedPathsListView(APIView):
         return Response(
             {
                 "walked_path_ids": result.path_ids,
+                "partially_walked_path_ids": result.partially_walked_path_ids,
                 "total_paths": result.total_count,
                 "walked_count": result.walked_count,
             },
