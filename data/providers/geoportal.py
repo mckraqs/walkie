@@ -1,5 +1,7 @@
 """Module for processing geoportal.gov.pl streets data.
 
+Note: this data provider is deprecated, module is kept for reference purposes.
+
 Steets dataset is a base datasource for paths in Poland. It contains all streets in
 Poland, with their names and geometries. It is used to create a graph of streets, which
 is then used to find paths between points.
