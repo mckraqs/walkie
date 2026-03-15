@@ -1003,14 +1003,21 @@ def _find_best_target_node(
 
     with connection.cursor() as cursor:
         cursor.execute(
-            f"""
+            """
             SELECT node, agg_cost
             FROM pgr_drivingDistance(%s, %s, %s, directed := false)
             WHERE node != %s
             ORDER BY ABS(agg_cost - %s)
-            LIMIT {TARGET_CANDIDATE_POOL_SIZE}
+            LIMIT %s
             """,
-            [edges_sql, source_node, max_cost, source_node, target_distance_m],
+            [
+                edges_sql,
+                source_node,
+                max_cost,
+                source_node,
+                target_distance_m,
+                TARGET_CANDIDATE_POOL_SIZE,
+            ],
         )
         rows = cursor.fetchall()
 
