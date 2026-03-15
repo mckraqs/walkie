@@ -614,6 +614,41 @@ function TooltipRepositioner({
   return null;
 }
 
+function PathTooltipCleaner({
+  hoveredPathIdRef,
+  hideTimerRef,
+  setTooltipData,
+  onPathHoverRef,
+  getBaseStyle,
+  resetSiblingsStyle,
+  layerMapRef,
+}: {
+  hoveredPathIdRef: React.MutableRefObject<number | null>;
+  hideTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>;
+  setTooltipData: (data: null) => void;
+  onPathHoverRef: React.MutableRefObject<((id: number | null) => void) | undefined>;
+  getBaseStyle: (pathId: number) => PathOptions;
+  resetSiblingsStyle: (pathId: number) => void;
+  layerMapRef: React.MutableRefObject<Map<number, L.Path>>;
+}) {
+  useMapEvents({
+    mousemove: (e) => {
+      if (hoveredPathIdRef.current == null) return;
+      const target = e.originalEvent.target;
+      if (target instanceof SVGElement) return; // still over a vector layer
+      // Mouse is over map tiles/background -- force-clear tooltip
+      const layer = layerMapRef.current.get(hoveredPathIdRef.current);
+      layer?.setStyle(getBaseStyle(hoveredPathIdRef.current));
+      resetSiblingsStyle(hoveredPathIdRef.current);
+      hoveredPathIdRef.current = null;
+      onPathHoverRef.current?.(null);
+      clearTimeout(hideTimerRef.current);
+      setTooltipData(null);
+    },
+  });
+  return null;
+}
+
 function TempPointMarkers({
   startTempPoint,
   endTempPoint,
@@ -940,6 +975,15 @@ export default function PathMap({
           pathFeatureMap={pathFeatureMap}
           tooltipPosRef={tooltipPosRef}
           tooltipElRef={tooltipElRef}
+        />
+        <PathTooltipCleaner
+          hoveredPathIdRef={hoveredPathIdRef}
+          hideTimerRef={hideTimerRef}
+          setTooltipData={setTooltipData}
+          onPathHoverRef={onPathHoverRef}
+          getBaseStyle={getBaseStyle}
+          resetSiblingsStyle={resetSiblingsStyle}
+          layerMapRef={layerMapRef}
         />
         <ResetViewControl region={region} paths={paths} />
         <MeasureControl active={measureActive} onToggle={toggleMeasure} />
