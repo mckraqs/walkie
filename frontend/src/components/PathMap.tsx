@@ -60,12 +60,6 @@ interface PathMapProps {
   previewRoute?: RouteResponse | null;
 }
 
-const PATH_STYLE: PathOptions = {
-  color: "#3b82f6",
-  weight: 3,
-  opacity: 1,
-};
-
 const PATH_DIMMED_STYLE: PathOptions = {
   color: "#3b82f6",
   weight: 2,
@@ -792,8 +786,6 @@ export default function PathMap({
   onSegmentClickRef.current = onSegmentClick;
   const selectedSegmentIdsRef = useRef(selectedSegmentIds);
   selectedSegmentIdsRef.current = selectedSegmentIds;
-  const isFavoriteRef = useRef(isFavorite);
-  isFavoriteRef.current = isFavorite;
   const composingRef = useRef(composing);
   composingRef.current = composing;
 
@@ -817,10 +809,7 @@ export default function PathMap({
   function getBaseStyle(pathId: number): PathOptions {
     if (hasRouteRef.current) return PATH_DIMMED_STYLE;
     const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
-    if (isFavoriteRef.current) {
-      return walked ? WALKED_HIGHLIGHT_STYLE : UNWALKED_DIMMED_STYLE;
-    }
-    return PATH_STYLE;
+    return walked ? WALKED_HIGHLIGHT_STYLE : UNWALKED_DIMMED_STYLE;
   }
 
   function getHoverStyle(pathId: number): PathOptions {
@@ -922,7 +911,7 @@ export default function PathMap({
 
   const pathStyleFn = useCallback(
     (feature: GeoJSON.Feature | undefined) => {
-      if (!feature) return PATH_STYLE;
+      if (!feature) return UNWALKED_DIMMED_STYLE;
       const pathId = (feature as PathFeature).id;
       return getBaseStyle(pathId);
     },
