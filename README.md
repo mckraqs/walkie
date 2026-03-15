@@ -78,7 +78,7 @@ Full documentation lives in the [`docs/`](docs/) directory. See the
 [table of contents](docs/index.md) for a complete listing.
 
 - **Onboarding**
-  - [overview](docs/onboarding/overview.md) (architecture, stacks, project structure)
+  - [overview](docs/onboarding/overview.md)
 - **Technical**
   - [models](docs/technical/models.md)
   - [API](docs/technical/api-overview.md)
