@@ -3,9 +3,11 @@
 ## Introduction
 
 Walkie is a web application that tracks walking progress of your favorite regions.
-It lets users set a starting point, choose preferences (duration, interests,
-accessibility), and receive a walking route displayed on an interactive map. The app is
-built for pleasant strolls, not cycling or driving navigation.
+Why walking the same route every single time while there's so much paths just waiting to
+be discovered. App supports all walking explorers to uncover the uknown!
+
+Walkie lets users set preferences like duration, starting & finish points or
+accessibility, and receive a walking route displayed on an interactive map.
 
 Spatial data (paths, points of interest, areas) is provided by operators through
 standard geospatial formats. No city or region is hardcoded - the system grows as new
