@@ -47,6 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (request: LoginRequest) => {
     const response = await apiLogin(request);
+    // localStorage is used for token storage for simplicity. This is susceptible to XSS
+    // but acceptable for single-user / small-scale deployments. For higher-security needs,
+    // consider httpOnly cookies with a CSRF token.
     localStorage.setItem("authToken", response.token);
     setAuthToken(response.token);
     setUser(response.user);

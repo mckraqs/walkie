@@ -877,14 +877,14 @@ def compute_segment_distance(segment_ids: list[int]) -> float:
     """
     if not segment_ids:
         return 0.0
-    id_list = ", ".join(str(int(sid)) for sid in segment_ids)
     with connection.cursor() as cursor:
         cursor.execute(
-            f"""
+            """
             SELECT SUM(ST_Length(geometry::geography))
             FROM segments
-            WHERE id IN ({id_list})
-            """
+            WHERE id = ANY(%s)
+            """,
+            [list(segment_ids)],
         )
         row = cursor.fetchone()
     if row is None or row[0] is None:

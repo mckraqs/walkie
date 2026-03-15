@@ -20,6 +20,12 @@ python/
 
 # Environment
 .env
+.env.local
+.env.production
+.env*.local
+
+# Claude
+.claude/settings.local.json
 
 # Backend
 backend/staticfiles/

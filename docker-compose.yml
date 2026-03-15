@@ -4,9 +4,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: walkie
-      POSTGRES_USER: walkie
-      POSTGRES_PASSWORD: walkie
+      POSTGRES_DB: ${POSTGRES_DB:-walkie}
+      POSTGRES_USER: ${POSTGRES_USER:-walkie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-walkie}
     volumes:
       - pgdata:/var/lib/postgresql/data
 

@@ -22,7 +22,7 @@ Edit `.env` with appropriate values:
 
 | Variable            | Description                 | Default     |
 | ------------------- | --------------------------- | ----------- |
-| `DEBUG`             | Enable Django debug mode    | `True`      |
+| `DEBUG`             | Enable Django debug mode    | `False`     |
 | `SECRET_KEY`        | Django secret key           | -           |
 | `POSTGRES_DB`       | Database name               | `walkie`    |
 | `POSTGRES_USER`     | Database user               | `walkie`    |
@@ -30,8 +30,8 @@ Edit `.env` with appropriate values:
 | `POSTGRES_HOST`     | Database host               | `localhost` |
 | `POSTGRES_PORT`     | Database port               | `5432`      |
 
-Set `POSTGRES_PORT=5433` to match the Docker Compose port mapping (host 5433 maps to
-container 5432).
+The Docker Compose port mapping is `5432:5432` (host:container), so the default port
+works without changes.
 
 If GDAL/GEOS libraries are not at the default Homebrew paths, override them:
 
@@ -55,7 +55,7 @@ docker compose ps
 ```
 
 The image is `pgrouting/pgrouting:17-3.5-3.7.3` (PostGIS and pgRouting included). Port
-mapping: host `5433` -> container `5432`.
+mapping: host `5432` -> container `5432`.
 
 ## Backend
 

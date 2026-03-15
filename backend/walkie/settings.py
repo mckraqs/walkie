@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,16 +30,18 @@ GEOS_LIBRARY_PATH = os.environ.get(
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1")
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1")
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
     if not DEBUG:
         msg = "SECRET_KEY environment variable is required when DEBUG=False"
         raise ImproperlyConfigured(msg)
-    SECRET_KEY = "django-insecure-local-development-only"
+    SECRET_KEY = get_random_secret_key()
 
-ALLOWED_HOSTS: list[str] = []
+ALLOWED_HOSTS: list[str] = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(
+    ","
+)
 
 
 # Application definition
@@ -150,7 +153,9 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CORS
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    "CORS_ALLOWED_ORIGINS", "http://localhost:3000"
+).split(",")
 
 # Django REST Framework
 REST_FRAMEWORK = {

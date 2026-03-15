@@ -125,7 +125,7 @@ class RouteGenerateView(APIView):
         except RouteGenerationError as exc:
             logger.warning("Route generation failed: %s", exc)
             return Response(
-                {"detail": str(exc)},
+                {"detail": "Route generation failed. Please try different parameters."},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
@@ -409,8 +409,14 @@ class RouteExportView(APIView):
             content_type = "application/gpx+xml"
             extension = "gpx"
 
+        safe_name = (
+            route.name.replace('"', "")
+            .replace("\\", "")
+            .replace("\r", "")
+            .replace("\n", "")
+        )
         response = HttpResponse(xml_content, content_type=content_type)
         response["Content-Disposition"] = (
-            f'attachment; filename="{route.name}.{extension}"'
+            f'attachment; filename="{safe_name}.{extension}"'
         )
         return response
