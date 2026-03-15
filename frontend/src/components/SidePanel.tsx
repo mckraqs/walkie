@@ -170,14 +170,16 @@ export default function SidePanel({
 
   return (
     <div className="absolute right-4 top-4 z-[1000] flex items-start">
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => setSidebarCollapsed((c) => !c)}
-        className="mt-1 shrink-0 dark:!bg-card dark:hover:!bg-accent"
-      >
-        {sidebarCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
-      </Button>
+      {isFavorite && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSidebarCollapsed((c) => !c)}
+          className="mt-1 shrink-0 dark:!bg-card dark:hover:!bg-accent"
+        >
+          {sidebarCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
+        </Button>
+      )}
 
       <div
         className="overflow-hidden transition-all duration-300 ease-in-out"
