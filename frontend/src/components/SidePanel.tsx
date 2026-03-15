@@ -36,6 +36,7 @@ interface SidePanelProps {
   onRenameRoute: (routeId: number, name: string) => Promise<void>;
   onToggleRouteWalked: (routeId: number) => void;
   onClearLoadedRoute: () => void;
+  onRouteHover: (routeId: number | null) => void;
   composing: boolean;
   onStartComposing: () => void;
   onStopComposing: () => void;
@@ -108,6 +109,7 @@ export default function SidePanel({
   onRenameRoute,
   onToggleRouteWalked,
   onClearLoadedRoute,
+  onRouteHover,
   composing,
   onStartComposing,
   onStopComposing,
@@ -216,6 +218,7 @@ export default function SidePanel({
                 onRenameRoute={onRenameRoute}
                 onToggleWalked={onToggleRouteWalked}
                 onClearLoadedRoute={onClearLoadedRoute}
+                onRouteHover={onRouteHover}
                 collapsed={savedRoutesCollapsed}
                 onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
                 height={savedRoutesHeight}

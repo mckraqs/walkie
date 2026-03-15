@@ -22,6 +22,7 @@ describe("SavedRoutes", () => {
     onRenameRoute: vi.fn<(routeId: number, name: string) => Promise<void>>().mockResolvedValue(undefined),
     onToggleWalked: vi.fn(),
     onClearLoadedRoute: vi.fn(),
+    onRouteHover: vi.fn(),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
     height: "300px",

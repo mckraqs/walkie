@@ -56,6 +56,8 @@ interface PathMapProps {
   searchHighlight?: [number, number] | null;
   focusPathId?: number | null;
   focusPathKey?: number;
+  hoveredRouteId?: number | null;
+  previewRoute?: RouteResponse | null;
 }
 
 const PATH_STYLE: PathOptions = {
@@ -690,6 +692,8 @@ export default function PathMap({
   searchHighlight,
   focusPathId,
   focusPathKey,
+  hoveredRouteId,
+  previewRoute,
 }: PathMapProps) {
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
@@ -888,6 +892,34 @@ export default function PathMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredPathId, isFavorite, pathFeatureMap]);
 
+  // Active route hover: highlight all route segments when hovering in sidebar
+  useEffect(() => {
+    if (hoveredRouteId == null || previewRoute != null) return;
+
+    // Only highlight if it's the active route (layers exist in routePathLayersRef)
+    const entries = Array.from(routePathLayersRef.current.values());
+    if (entries.length === 0) return;
+
+    for (const group of entries) {
+      for (const entry of group) {
+        entry.layer.setStyle(ROUTE_HOVER_STYLE);
+        entry.layer.bringToFront();
+      }
+    }
+
+    return () => {
+      for (const group of entries) {
+        for (const entry of group) {
+          entry.layer.setStyle({
+            color: entry.color,
+            weight: 4,
+            opacity: 0.9,
+          });
+        }
+      }
+    };
+  }, [hoveredRouteId, previewRoute]);
+
   const pathStyleFn = useCallback(
     (feature: GeoJSON.Feature | undefined) => {
       if (!feature) return PATH_STYLE;
@@ -1073,6 +1105,16 @@ export default function PathMap({
               }}
             />
             <RouteMarkers route={route} />
+          </>
+        )}
+        {previewRoute && previewRoute.segments.features.length > 0 && (
+          <>
+            <GeoJSON
+              key={`route-preview-${hoveredRouteId}`}
+              data={previewRoute.segments}
+              style={() => ROUTE_HOVER_STYLE}
+            />
+            <RouteMarkers route={previewRoute} />
           </>
         )}
         {composing && segments && (

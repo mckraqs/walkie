@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   generateRoute,
@@ -87,6 +87,12 @@ export default function RegionExplorer({
   const [composerError, setComposerError] = useState<string | null>(null);
   const [pendingDisconnectedSegment, setPendingDisconnectedSegment] = useState<number | null>(null);
 
+  // Route hover preview state
+  const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
+  const [previewRoute, setPreviewRoute] = useState<RouteResponse | null>(null);
+  const routePreviewCacheRef = useRef<Map<number, RouteResponse>>(new Map());
+  const hoverAbortRef = useRef<AbortController | null>(null);
+
   // Point picking state
   const [pickingPoint, setPickingPoint] = useState<"start" | "end" | null>(null);
   const [startTempPoint, setStartTempPoint] = useState<TempPoint | null>(null);
@@ -158,6 +164,7 @@ export default function RegionExplorer({
       setError(null);
       try {
         const result = await loadRoute(regionId, routeId);
+        routePreviewCacheRef.current.set(routeId, result);
         setRoute(result);
         setActiveRouteId(routeId);
       } catch (err) {
@@ -260,6 +267,43 @@ export default function RegionExplorer({
     setActiveRouteId(null);
     setError(null);
   }, []);
+
+  const handleRouteHover = useCallback(
+    (routeId: number | null) => {
+      setHoveredRouteId(routeId);
+
+      // Cancel any in-flight preview fetch
+      hoverAbortRef.current?.abort();
+      hoverAbortRef.current = null;
+
+      if (routeId === null || routeId === activeRouteId) {
+        setPreviewRoute(null);
+        return;
+      }
+
+      // Check cache first
+      const cached = routePreviewCacheRef.current.get(routeId);
+      if (cached) {
+        setPreviewRoute(cached);
+        return;
+      }
+
+      // Fetch route data for preview
+      const controller = new AbortController();
+      hoverAbortRef.current = controller;
+      loadRoute(regionId, routeId)
+        .then((result) => {
+          if (!controller.signal.aborted) {
+            routePreviewCacheRef.current.set(routeId, result);
+            setPreviewRoute(result);
+          }
+        })
+        .catch(() => {
+          // Silently ignore fetch errors on hover
+        });
+    },
+    [regionId, activeRouteId],
+  );
 
   // --- Point picking handlers ---
   const handlePickPointOnMap = useCallback((which: "start" | "end") => {
@@ -516,6 +560,7 @@ export default function RegionExplorer({
         onRenameRoute={handleRenameRoute}
         onToggleRouteWalked={handleToggleRouteWalked}
         onClearLoadedRoute={handleClearLoadedRoute}
+        onRouteHover={handleRouteHover}
         composing={composing}
         onStartComposing={handleStartComposing}
         onStopComposing={handleStopComposing}
@@ -579,6 +624,8 @@ export default function RegionExplorer({
         searchHighlight={searchHighlight}
         focusPathId={focusPathId}
         focusPathKey={focusPathKey}
+        hoveredRouteId={hoveredRouteId}
+        previewRoute={previewRoute}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog

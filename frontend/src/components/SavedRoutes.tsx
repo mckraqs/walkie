@@ -21,6 +21,7 @@ interface SavedRoutesProps {
   onRenameRoute: (routeId: number, name: string) => Promise<void>;
   onToggleWalked: (routeId: number) => void;
   onClearLoadedRoute: () => void;
+  onRouteHover: (routeId: number | null) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
@@ -36,6 +37,7 @@ export default function SavedRoutes({
   onRenameRoute,
   onToggleWalked,
   onClearLoadedRoute,
+  onRouteHover,
   collapsed,
   onToggleCollapsed,
   height,
@@ -105,6 +107,8 @@ export default function SavedRoutes({
                     onLoadRoute(route.id);
                   }
                 }}
+                onMouseEnter={() => onRouteHover(route.id)}
+                onMouseLeave={() => onRouteHover(null)}
                 className={`cursor-pointer rounded-md border px-2.5 py-2 text-sm transition-colors ${
                   activeRouteId === route.id
                     ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/30"
