@@ -262,6 +262,67 @@ describe("RoutePlanner", () => {
     });
   });
 
+  it("shows 'Already walked' checkbox unchecked by default in save dialog", async () => {
+    const user = userEvent.setup();
+    const route = makeRouteResponse();
+    render(<RoutePlanner {...defaultProps} route={route} />);
+
+    await user.click(screen.getByRole("tab", { name: "Generate" }));
+    await user.click(screen.getByRole("button", { name: "Save Route" }));
+
+    const checkbox = screen.getByRole("checkbox", { name: "Already walked" });
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
+  });
+
+  it("passes walked: true in onSaveRoute when checkbox is checked", async () => {
+    const user = userEvent.setup();
+    const route = makeRouteResponse();
+    render(<RoutePlanner {...defaultProps} route={route} />);
+
+    await user.click(screen.getByRole("tab", { name: "Generate" }));
+    await user.click(screen.getByRole("button", { name: "Save Route" }));
+
+    await user.click(screen.getByRole("checkbox", { name: "Already walked" }));
+
+    const nameInput = screen.getByPlaceholderText("Route name");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Test Walk");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(defaultProps.onSaveRoute).toHaveBeenCalledWith(
+        expect.objectContaining({ walked: true }),
+      );
+    });
+  });
+
+  it("passes walked: true in onSaveComposedRoute when checkbox is checked", async () => {
+    const user = userEvent.setup();
+    render(
+      <RoutePlanner
+        {...defaultProps}
+        composing={true}
+        selectedSegmentCount={3}
+        composedTotalDistance={2000}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save Route" }));
+    await user.click(screen.getByRole("checkbox", { name: "Already walked" }));
+
+    const nameInput = screen.getByPlaceholderText("Route name");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Composed Walk");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(defaultProps.onSaveComposedRoute).toHaveBeenCalledWith(
+        expect.objectContaining({ walked: true }),
+      );
+    });
+  });
+
   it("displays composer error", () => {
     render(
       <RoutePlanner

@@ -16,6 +16,7 @@ import type {
   SaveRouteRequest,
   RouteRenameRequest,
   RouteWalkToggleResponse,
+  SaveRouteResponse,
   RemoveFavoriteResponse,
   GeocodingResult,
 } from "@/types/geo";
@@ -270,7 +271,7 @@ export async function deletePlace(
 export async function saveRoute(
   regionId: string,
   request: SaveRouteRequest,
-): Promise<RouteListItem> {
+): Promise<SaveRouteResponse> {
   const res = await fetch(
     `${API_URL}/api/regions/${regionId}/routes/saved/`,
     {

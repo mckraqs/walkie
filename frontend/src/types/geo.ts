@@ -163,8 +163,15 @@ export interface SaveRouteRequest {
   total_distance: number;
   is_loop: boolean;
   is_custom?: boolean;
+  walked?: boolean;
   start_point: [number, number] | null;
   end_point: [number, number] | null;
+}
+
+export interface SaveRouteResponse extends RouteListItem {
+  walked_path_ids?: number[];
+  total_paths?: number;
+  walked_count?: number;
 }
 
 export interface RouteRenameRequest {

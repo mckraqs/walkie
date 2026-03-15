@@ -227,13 +227,17 @@ class RouteListCreateView(APIView):
             total_distance=serializer.validated_data["total_distance"],
             is_loop=serializer.validated_data["is_loop"],
             is_custom=is_custom,
+            walked=serializer.validated_data["walked"],
             start_point=serializer.validated_data.get("start_point"),
             end_point=serializer.validated_data.get("end_point"),
         )
-        return Response(
-            RouteListItemSerializer(route).data,
-            status=status.HTTP_201_CREATED,
-        )
+        response_data = RouteListItemSerializer(route).data
+        if route.walked:
+            result = _get_walked_paths(request.user, region)
+            response_data["walked_path_ids"] = result.path_ids
+            response_data["total_paths"] = result.total_count
+            response_data["walked_count"] = result.walked_count
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 class RouteDetailView(APIView):

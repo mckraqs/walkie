@@ -966,6 +966,77 @@ class TestRouteListCreateView:
 
         assert response.status_code == 409
 
+    def test_create_route_walked_true(
+        self,
+        region_with_topology_and_paths: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST with walked=true creates walked route and returns walk stats."""
+        region = region_with_topology_and_paths
+        FavoriteRegion.objects.create(user=user, region=region)
+        segment_ids = list(
+            Segment.objects.filter(region=region).values_list("pk", flat=True)[:2]
+        )
+
+        response = auth_client.post(
+            f"/api/regions/{region.pk}/routes/saved/",
+            {
+                "name": "Walked Route",
+                "segment_ids": segment_ids,
+                "total_distance": 300.0,
+                "is_loop": False,
+                "walked": True,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["walked"] is True
+        assert "walked_path_ids" in data
+        assert "total_paths" in data
+        assert "walked_count" in data
+        assert isinstance(data["walked_path_ids"], list)
+
+        route = Route.objects.get(pk=data["id"])
+        assert route.walked is True
+
+    def test_create_route_walked_defaults_false(
+        self,
+        region_with_topology: Region,
+        user: User,
+        auth_client: APIClient,
+    ) -> None:
+        """POST without walked creates route with walked=False, no walk stats."""
+        FavoriteRegion.objects.create(user=user, region=region_with_topology)
+        segment_ids = list(
+            Segment.objects.filter(region=region_with_topology).values_list(
+                "pk", flat=True
+            )[:2]
+        )
+
+        response = auth_client.post(
+            f"/api/regions/{region_with_topology.pk}/routes/saved/",
+            {
+                "name": "Normal Route",
+                "segment_ids": segment_ids,
+                "total_distance": 300.0,
+                "is_loop": False,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["walked"] is False
+        assert "walked_path_ids" not in data
+        assert "total_paths" not in data
+        assert "walked_count" not in data
+
+        route = Route.objects.get(pk=data["id"])
+        assert route.walked is False
+
     def test_list_non_favorite_returns_403(
         self,
         region_with_topology: Region,

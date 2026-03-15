@@ -95,6 +95,7 @@ export default function RoutePlanner({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [routeName, setRouteName] = useState("");
+  const [markedWalked, setMarkedWalked] = useState(false);
 
   // Sync mode with external composing prop
   useEffect(() => {
@@ -111,6 +112,7 @@ export default function RoutePlanner({
     setSaveError(null);
     setRouteName("");
     setSaving(false);
+    setMarkedWalked(false);
   }, [mode, route]);
 
   useEffect(() => {
@@ -319,7 +321,7 @@ export default function RoutePlanner({
   );
 
   const saveInputBlock = showSaveInput && (
-    <div className="mt-2 space-y-1">
+    <div className="mt-2 space-y-2">
       <Input
         type="text"
         value={routeName}
@@ -327,6 +329,14 @@ export default function RoutePlanner({
         disabled={saving}
         placeholder="Route name"
       />
+      <label className="flex cursor-pointer items-center gap-2">
+        <Checkbox
+          checked={markedWalked}
+          onCheckedChange={(checked) => setMarkedWalked(!!checked)}
+          disabled={saving}
+        />
+        <span className="text-sm font-medium">Already walked</span>
+      </label>
       <div className="flex gap-1">
         <Button
           size="sm"
@@ -341,6 +351,7 @@ export default function RoutePlanner({
                   segment_ids: route.segments.features.map((f) => f.id),
                   total_distance: route.total_distance,
                   is_loop: route.is_loop,
+                  walked: markedWalked,
                   start_point: route.start_point,
                   end_point: route.end_point,
                 });
@@ -353,6 +364,7 @@ export default function RoutePlanner({
                   total_distance: composedTotalDistance,
                   is_loop: composedIsLoop,
                   is_custom: true,
+                  walked: markedWalked,
                   start_point: null,
                   end_point: null,
                 });

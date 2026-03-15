@@ -154,8 +154,11 @@ export default function RegionExplorer({
     async (request: SaveRouteRequest) => {
       const saved = await saveRoute(regionId, request);
       setSavedRoutes((prev) => [saved, ...prev]);
+      if (saved.walked && saved.walked_path_ids) {
+        onWalkedChange(saved.walked_path_ids, saved.total_paths!, saved.walked_count!);
+      }
     },
-    [regionId],
+    [regionId, onWalkedChange],
   );
 
   const handleLoadRoute = useCallback(
@@ -528,8 +531,11 @@ export default function RegionExplorer({
       };
       const saved = await saveRoute(regionId, fullRequest);
       setSavedRoutes((prev) => [saved, ...prev]);
+      if (saved.walked && saved.walked_path_ids) {
+        onWalkedChange(saved.walked_path_ids, saved.total_paths!, saved.walked_count!);
+      }
     },
-    [regionId, selectedSegmentIds, composedTotalDistance, composedIsLoop, composedStartPoint, composedEndPoint],
+    [regionId, selectedSegmentIds, composedTotalDistance, composedIsLoop, composedStartPoint, composedEndPoint, onWalkedChange],
   );
 
   // When generating/loading a route, exit compose mode
