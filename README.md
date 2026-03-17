@@ -38,15 +38,15 @@ datasets are uploaded.
 
 ## Prerequisites
 
-- **Python 3.14+** (managed via [uv](https://docs.astral.sh/uv/))
-- **Node.js 25+** / npm 11+
-- **Docker Desktop**
-- **GDAL** - `brew install gdal` on macOS (provides GDAL and GEOS libraries for
-  GeoDjango)
+**Docker path** (recommended):
+[Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+**Native path**: Python 3.14+ (via [uv](https://docs.astral.sh/uv/)), Node.js 25+ / npm
+11+, Docker Desktop, GDAL (`brew install gdal` on macOS)
 
 ## Getting Started
 
-Setting up the project and starting the app:
+### Docker Compose (Recommended)
 
 ```bash
 # 1. Clone the repository
@@ -56,31 +56,25 @@ cd walkie
 # 2. Copy environment file and customize if needed
 cp .env.example .env
 
-# 3. Install Python dependencies
-uv sync
-
-# 4. Start PostGIS database
-open -a Docker          # ensure Docker Desktop is running
-docker compose up -d
-
-# 5. Apply database migrations
-uv run python backend/manage.py migrate
-
-# 6. Start the backend (runs on http://localhost:8000)
-uv run python backend/manage.py runserver
-
-# 7. In a separate terminal, start the frontend (runs on http://localhost:3000)
-cd frontend && npm install && npm run dev
+# 3. Start all services (database, backend, frontend)
+docker compose up --build
 ```
 
-To stop everything, run below commands:
+The backend runs on <http://localhost:8000> and the frontend on <http://localhost:3000>.
+Migrations run automatically on startup. Editing files on the host auto-reloads both
+services.
+
+To stop everything:
 
 ```bash
-# Stop the frontend and backend servers with Ctrl+C in their respective terminals
-
-# Stop the database
-docker compose down
+docker compose down        # stop all services
+docker compose down -v     # stop and wipe the database volume
 ```
+
+### Alternative: Native Setup
+
+See [docs/technical/local-setup.md](docs/technical/local-setup.md) for running Python
+and Node.js directly on the host (database still runs in Docker).
 
 ## Configuration
 

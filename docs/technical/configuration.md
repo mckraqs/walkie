@@ -17,7 +17,19 @@ development defaults (`walkie`/`walkie`/`walkie`) when variables are unset.
 | `ALLOWED_HOSTS`        | Comma-separated list | `localhost,127.0.0.1`    |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated list | `http://localhost:3000`  |
 
-## GDAL / GEOS Library Paths
+## Docker Compose
+
+When running via `docker compose up`, the following configuration is handled
+automatically:
+
+- **`POSTGRES_HOST`** is overridden to `db` (the compose service name) by the
+  `environment` block in `docker-compose.yml`. The value in `.env` is ignored.
+- **GDAL and GEOS** libraries are installed inside the backend Docker image
+  (`backend/Dockerfile`). The environment variables `GDAL_LIBRARY_PATH` and
+  `GEOS_LIBRARY_PATH` are set to the correct paths within the container. No host-level
+  GDAL installation is needed when using Docker.
+
+## GDAL / GEOS Library Paths (Native Setup)
 
 GeoDjango requires GDAL and GEOS native libraries. On macOS with Homebrew the defaults
 point to `/opt/homebrew/lib/`. Override via environment variables if your paths differ:
@@ -26,6 +38,8 @@ point to `/opt/homebrew/lib/`. Override via environment variables if your paths 
 export GDAL_LIBRARY_PATH="/opt/homebrew/lib/libgdal.dylib"
 export GEOS_LIBRARY_PATH="/opt/homebrew/lib/libgeos_c.dylib"
 ```
+
+These variables are only needed for native (non-Docker) development.
 
 ## CORS
 

@@ -22,36 +22,40 @@ areas and revisit favorite routes.
 ## Architecture Overview
 
 ```text
-Browser (Next.js 16 / React 19)
-    |
-    | REST API (JSON + GeoJSON)
-    |
-Django 6 + DRF + GeoDjango
-    |
-    | SQL + PostGIS + pgRouting
-    |
-PostgreSQL 17
+┌─── Docker Compose ─────────────────────────┐
+│                                             │
+│  Browser (Next.js 16 / React 19)           │
+│      |                                      │
+│      | REST API (JSON + GeoJSON)            │
+│      |                                      │
+│  Django 6 + DRF + GeoDjango                │
+│      |                                      │
+│      | SQL + PostGIS + pgRouting            │
+│      |                                      │
+│  PostgreSQL 17                              │
+│                                             │
+└─────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
 
-| Technology               | Purpose                                 |
-| ------------------------ | --------------------------------------- |
-| Python 3.14              | Backend language                        |
-| Django 6 + DRF           | Web framework and REST API              |
-| GeoDjango + PostGIS      | Spatial data handling and queries       |
-| pgRouting                | Graph-based route generation (Dijkstra) |
-| Next.js 16 + React 19    | Frontend framework                      |
-| TypeScript               | Frontend type safety                    |
-| Leaflet                  | Interactive map rendering               |
-| Tailwind CSS + shadcn/ui | Styling and component library           |
-| PostgreSQL 17            | Primary database                        |
-| Docker                   | Database containerization               |
-| uv                       | Python dependency management            |
-| ruff                     | Linting and formatting                  |
-| pyright                  | Static type checking                    |
-| Vitest                   | Frontend testing                        |
-| pytest                   | Backend testing                         |
+| Technology               | Purpose                                  |
+| ------------------------ | ---------------------------------------- |
+| Python 3.14              | Backend language                         |
+| Django 6 + DRF           | Web framework and REST API               |
+| GeoDjango + PostGIS      | Spatial data handling and queries        |
+| pgRouting                | Graph-based route generation (Dijkstra)  |
+| Next.js 16 + React 19    | Frontend framework                       |
+| TypeScript               | Frontend type safety                     |
+| Leaflet                  | Interactive map rendering                |
+| Tailwind CSS + shadcn/ui | Styling and component library            |
+| PostgreSQL 17            | Primary database                         |
+| Docker                   | Development environment containerization |
+| uv                       | Python dependency management             |
+| ruff                     | Linting and formatting                   |
+| pyright                  | Static type checking                     |
+| Vitest                   | Frontend testing                         |
+| pytest                   | Backend testing                          |
 
 ## Project Structure
 
