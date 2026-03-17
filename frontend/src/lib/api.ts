@@ -19,6 +19,8 @@ import type {
   SaveRouteResponse,
   RemoveFavoriteResponse,
   GeocodingResult,
+  MatchGeometryRequest,
+  MatchGeometryResponse,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -375,6 +377,26 @@ export async function toggleRouteWalked(
   handle401(res);
   if (!res.ok) {
     throw new Error(`Failed to toggle route walked: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function matchGeometry(
+  regionId: string,
+  request: MatchGeometryRequest,
+): Promise<MatchGeometryResponse> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/routes/match-geometry/`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(request),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to match geometry: ${res.status}`);
   }
   return res.json();
 }

@@ -1,5 +1,6 @@
 """Views for the routes app."""
 
+import json
 import logging
 
 from django.contrib.gis.geos import Point
@@ -15,6 +16,7 @@ from places.models import Place
 from regions.models import Region
 from routes.models import Route
 from routes.serializers import (
+    MatchGeometryRequestSerializer,
     RouteCreateSerializer,
     RouteGenerateRequestSerializer,
     RouteListItemSerializer,
@@ -30,6 +32,7 @@ from routes.services import (
     generate_route,
     get_route_path_names,
     get_route_segments,
+    match_segments_to_geometry,
 )
 from users.models import FavoriteRegion
 from users.views import _get_walked_paths
@@ -197,15 +200,17 @@ class RouteListCreateView(APIView):
 
         segment_ids = serializer.validated_data["segment_ids"]
         is_custom = serializer.validated_data["is_custom"]
+        custom_geometry_data = serializer.validated_data.get("custom_geometry")
 
-        existing_count = Segment.objects.filter(
-            pk__in=segment_ids, region=region
-        ).count()
-        if existing_count != len(set(segment_ids)):
-            return Response(
-                {"detail": "One or more segment IDs do not belong to this region."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if segment_ids:
+            existing_count = Segment.objects.filter(
+                pk__in=segment_ids, region=region
+            ).count()
+            if existing_count != len(set(segment_ids)):
+                return Response(
+                    {"detail": "One or more segment IDs do not belong to this region."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         route_count = Route.objects.filter(user=request.user, region=region).count()
         if route_count >= MAX_SAVED_ROUTES_PER_REGION:
@@ -219,14 +224,32 @@ class RouteListCreateView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Convert GeoJSON to GEOSGeometry for the custom_geometry field.
+        custom_geom = None
+        total_distance = serializer.validated_data["total_distance"]
+        if custom_geometry_data is not None:
+            from django.contrib.gis.geos import GEOSGeometry
+
+            custom_geom = GEOSGeometry(json.dumps(custom_geometry_data), srid=4326)
+            is_custom = True
+
+            # Re-match segments server-side to ensure correct segment_ids
+            # regardless of frontend state (avoids race conditions).
+            match_result = match_segments_to_geometry(
+                region_id, json.dumps(custom_geometry_data)
+            )
+            segment_ids = match_result.segment_ids
+            total_distance = match_result.total_distance
+
         route = Route.objects.create(
             user=request.user,
             region=region,
             name=serializer.validated_data["name"],
             segment_ids=segment_ids,
-            total_distance=serializer.validated_data["total_distance"],
+            total_distance=total_distance,
             is_loop=serializer.validated_data["is_loop"],
             is_custom=is_custom,
+            custom_geometry=custom_geom,
             walked=serializer.validated_data["walked"],
             start_point=serializer.validated_data.get("start_point"),
             end_point=serializer.validated_data.get("end_point"),
@@ -270,6 +293,10 @@ class RouteDetailView(APIView):
         segments_data = RouteSegmentSerializer(segments_qs, many=True).data
         path_names = get_route_path_names(route.segment_ids)
 
+        custom_geometry_geojson = None
+        if route.custom_geometry:
+            custom_geometry_geojson = json.loads(route.custom_geometry.geojson)
+
         return Response(
             {
                 "total_distance": route.total_distance,
@@ -279,6 +306,7 @@ class RouteDetailView(APIView):
                 "segments": segments_data,
                 "paths_count": len(path_names),
                 "path_names": path_names,
+                "custom_geometry": custom_geometry_geojson,
             }
         )
 
@@ -368,6 +396,49 @@ class RouteWalkToggleView(APIView):
                 "partially_walked_path_ids": result.partially_walked_path_ids,
                 "total_paths": result.total_count,
                 "walked_count": result.walked_count,
+            }
+        )
+
+
+class MatchGeometryView(APIView):
+    """Match a drawn LineString to region segments."""
+
+    def post(self, request: Request, region_id: int) -> Response:
+        """Match a drawn geometry against segments in the region.
+
+        Args:
+            request: The authenticated HTTP request with GeoJSON LineString.
+            region_id: The region primary key.
+
+        Returns:
+            200 with matched segment IDs, distance, and street names.
+        """
+        region = get_object_or_404(Region, pk=region_id)
+        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
+            return Response(
+                {"detail": "Access restricted to your favorite regions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = MatchGeometryRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        geojson = json.dumps(serializer.validated_data["geometry"])
+        result = match_segments_to_geometry(region_id, geojson)
+
+        # Include matched segment geometries for map rendering.
+        segments_data = []
+        if result.segment_ids:
+            segments_qs = Segment.objects.filter(pk__in=result.segment_ids)
+            segments_data = RouteSegmentSerializer(segments_qs, many=True).data
+
+        return Response(
+            {
+                "matched_segment_ids": result.segment_ids,
+                "total_distance": result.total_distance,
+                "matched_count": len(result.segment_ids),
+                "street_names": result.street_names,
+                "segments": segments_data,
             }
         )
 

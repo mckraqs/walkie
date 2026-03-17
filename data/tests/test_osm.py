@@ -133,9 +133,7 @@ class TestShouldExcludeWay:
     def test_wildlife_allows_unnamed(self) -> None:
         """Wildlife mode does not exclude unnamed ways."""
         assert (
-            _should_exclude_way(
-                {"highway": "path"}, region_type=RegionType.WILDLIFE
-            )
+            _should_exclude_way({"highway": "path"}, region_type=RegionType.WILDLIFE)
             is False
         )
 
@@ -171,9 +169,7 @@ class TestShouldExcludeWay:
     def test_city_still_excludes_unnamed(self) -> None:
         """Explicit CITY region type excludes unnamed ways."""
         assert (
-            _should_exclude_way(
-                {"highway": "residential"}, region_type=RegionType.CITY
-            )
+            _should_exclude_way({"highway": "residential"}, region_type=RegionType.CITY)
             is True
         )
 

@@ -80,7 +80,7 @@ class RouteCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     segment_ids = serializers.ListField(
         child=serializers.IntegerField(),
-        min_length=1,
+        allow_empty=True,
     )
     total_distance = serializers.FloatField(min_value=0)
     is_loop = serializers.BooleanField(default=False)
@@ -102,6 +102,22 @@ class RouteCreateSerializer(serializers.Serializer):
         default=None,
         allow_null=True,
     )
+    custom_geometry = serializers.JSONField(required=False, default=None)
+
+    def validate(self, attrs: dict) -> dict:
+        """Ensure segment_ids is non-empty unless custom_geometry is provided."""
+        has_custom = attrs.get("custom_geometry") is not None
+        if not attrs.get("segment_ids") and not has_custom:
+            raise serializers.ValidationError(
+                "segment_ids must be non-empty unless custom_geometry is provided."
+            )
+        if has_custom:
+            geom = attrs["custom_geometry"]
+            if not isinstance(geom, dict) or geom.get("type") != "LineString":
+                raise serializers.ValidationError(
+                    {"custom_geometry": "Must be a GeoJSON LineString."}
+                )
+        return attrs
 
 
 class RouteListItemSerializer(serializers.Serializer):
@@ -114,6 +130,36 @@ class RouteListItemSerializer(serializers.Serializer):
     is_custom = serializers.BooleanField(read_only=True)
     walked = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+
+
+class MatchGeometryRequestSerializer(serializers.Serializer):
+    """Validate a geometry matching request."""
+
+    geometry = serializers.JSONField()
+
+    def validate_geometry(self, value: dict) -> dict:
+        """Ensure the geometry is a valid LineString with at least 2 coordinates."""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Geometry must be a GeoJSON object.")
+        if value.get("type") != "LineString":
+            raise serializers.ValidationError("Geometry type must be LineString.")
+        coords = value.get("coordinates")
+        if not isinstance(coords, list) or len(coords) < 2:
+            raise serializers.ValidationError(
+                "LineString must have at least 2 coordinates."
+            )
+        return value
+
+
+class MatchGeometryResponseSerializer(serializers.Serializer):
+    """Serialize a geometry matching response."""
+
+    matched_segment_ids = serializers.ListField(
+        child=serializers.IntegerField(), read_only=True
+    )
+    total_distance = serializers.FloatField(read_only=True)
+    matched_count = serializers.IntegerField(read_only=True)
+    street_names = serializers.ListField(child=serializers.CharField(), read_only=True)
 
 
 class RouteRenameSerializer(serializers.Serializer):

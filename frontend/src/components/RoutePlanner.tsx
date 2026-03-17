@@ -23,9 +23,10 @@ import type {
   RouteType,
   SaveRouteRequest,
   Place,
+  MatchGeometryResponse,
 } from "@/types/geo";
 
-type PlannerMode = "initial" | "composing";
+type PlannerMode = "initial" | "composing" | "drawing";
 
 interface RoutePlannerProps {
   route: RouteResponse | null;
@@ -55,6 +56,14 @@ interface RoutePlannerProps {
   onClearAllSegments: () => void;
   onSaveComposedRoute: (request: SaveRouteRequest) => Promise<void>;
   composerError: string | null;
+  drawingWalk: boolean;
+  onStartDrawing: () => void;
+  onStopDrawing: () => void;
+  drawnVertexCount: number;
+  drawMatchResult: MatchGeometryResponse | null;
+  drawMatchLoading: boolean;
+  onSaveDrawnWalk: (name: string) => Promise<void>;
+  onDrawUndo: () => void;
 }
 
 export default function RoutePlanner({
@@ -85,6 +94,14 @@ export default function RoutePlanner({
   onClearAllSegments,
   onSaveComposedRoute,
   composerError,
+  drawingWalk,
+  onStartDrawing,
+  onStopDrawing,
+  drawnVertexCount,
+  drawMatchResult,
+  drawMatchLoading,
+  onSaveDrawnWalk,
+  onDrawUndo,
 }: RoutePlannerProps) {
   const [mode, setMode] = useState<PlannerMode>("initial");
   const [distance, setDistance] = useState("3");
@@ -97,14 +114,16 @@ export default function RoutePlanner({
   const [routeName, setRouteName] = useState("");
   const [markedWalked, setMarkedWalked] = useState(false);
 
-  // Sync mode with external composing prop
+  // Sync mode with external composing/drawing props
   useEffect(() => {
-    if (composing) {
+    if (drawingWalk) {
+      setMode("drawing");
+    } else if (composing) {
       setMode("composing");
-    } else if (mode === "composing") {
+    } else if (mode === "composing" || mode === "drawing") {
       setMode("initial");
     }
-  }, [composing]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [composing, drawingWalk]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset save-related state on mode change or when route is cleared/set
   useEffect(() => {
@@ -415,6 +434,7 @@ export default function RoutePlanner({
             <TabsList className="mb-3 w-full">
               <TabsTrigger value="compose">Compose</TabsTrigger>
               <TabsTrigger value="generate">Generate</TabsTrigger>
+              <TabsTrigger value="draw">Draw</TabsTrigger>
             </TabsList>
             <TabsContent value="compose">
               <Button
@@ -424,6 +444,18 @@ export default function RoutePlanner({
               >
                 Start Composing
               </Button>
+            </TabsContent>
+            <TabsContent value="draw">
+              <Button
+                disabled={!isFavorite}
+                onClick={onStartDrawing}
+                className="w-full"
+              >
+                Start Drawing
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Click on the map to trace the walk you completed. Nearby segments will be matched automatically.
+              </p>
             </TabsContent>
             <TabsContent value="generate">
               {generationForm}
@@ -560,6 +592,143 @@ export default function RoutePlanner({
 
             {composerError && (
               <p className="text-xs text-destructive">{composerError}</p>
+            )}
+          </div>
+        )}
+
+        {mode === "drawing" && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Click on the map to place vertices. Matched segments update as you draw.
+            </p>
+
+            {drawnVertexCount > 0 && (
+              <div className="space-y-1 text-sm">
+                <p>
+                  <span className="font-medium">Vertices:</span>{" "}
+                  {drawnVertexCount}
+                </p>
+                {drawMatchResult && (
+                  <>
+                    <p>
+                      <span className="font-medium">Matched segments:</span>{" "}
+                      {drawMatchResult.matched_count}
+                    </p>
+                    <p>
+                      <span className="font-medium">Distance:</span>{" "}
+                      {formatDistance(drawMatchResult.total_distance)}
+                    </p>
+                    {drawMatchResult.street_names.length > 0 && (
+                      <ul className="ml-4 list-disc text-xs text-muted-foreground">
+                        {drawMatchResult.street_names.map((name) => (
+                          <li key={name}>{name}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+                {drawMatchLoading && (
+                  <p className="text-xs text-muted-foreground">Matching...</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDrawUndo}
+                disabled={drawnVertexCount === 0}
+                className="flex-1"
+              >
+                Undo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onStopDrawing}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+
+            {drawMatchResult && drawMatchResult.matched_count === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No matching segments found. You can still save this walk.
+              </p>
+            )}
+
+            {drawnVertexCount >= 2 && !drawMatchLoading && !showSaveInput && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const names = drawMatchResult?.street_names ?? [];
+                  const defaultName =
+                    names.length > 1
+                      ? `${names[0]} -> ${names[names.length - 1]}`
+                      : names.length === 1
+                        ? names[0]
+                        : "Drawn Walk";
+                  setRouteName(defaultName);
+                  setShowSaveInput(true);
+                  setSaveError(null);
+                }}
+                className="w-full border-green-300 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
+              >
+                Save as Walked
+              </Button>
+            )}
+
+            {showSaveInput && (
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  value={routeName}
+                  onChange={(e) => setRouteName(e.target.value)}
+                  disabled={saving}
+                  placeholder="Walk name"
+                />
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    disabled={saving || !routeName.trim()}
+                    onClick={async () => {
+                      setSaving(true);
+                      setSaveError(null);
+                      try {
+                        await onSaveDrawnWalk(routeName.trim());
+                        setShowSaveInput(false);
+                      } catch (err) {
+                        setSaveError(
+                          err instanceof Error ? err.message : "Failed to save",
+                        );
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    {saving ? "..." : "Confirm"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowSaveInput(false);
+                      setSaveError(null);
+                    }}
+                    disabled={saving}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                {saveError && (
+                  <p className="text-xs text-destructive">{saveError}</p>
+                )}
+              </div>
             )}
           </div>
         )}

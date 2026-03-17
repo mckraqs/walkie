@@ -16,6 +16,7 @@ import type {
   Place,
   PathFeature,
   GeocodingResult,
+  MatchGeometryResponse,
 } from "@/types/geo";
 
 const HEADER = "2.75rem";
@@ -47,6 +48,14 @@ interface SidePanelProps {
   onClearAllSegments: () => void;
   onSaveComposedRoute: (request: SaveRouteRequest) => Promise<void>;
   composerError: string | null;
+  drawingWalk: boolean;
+  onStartDrawing: () => void;
+  onStopDrawing: () => void;
+  drawnVertexCount: number;
+  drawMatchResult: MatchGeometryResponse | null;
+  drawMatchLoading: boolean;
+  onSaveDrawnWalk: (name: string) => Promise<void>;
+  onDrawUndo: () => void;
   paths: PathFeature[];
   walkedPathIds: Set<number>;
   hoveredPathId: number | null;
@@ -120,6 +129,14 @@ export default function SidePanel({
   onClearAllSegments,
   onSaveComposedRoute,
   composerError,
+  drawingWalk,
+  onStartDrawing,
+  onStopDrawing,
+  drawnVertexCount,
+  drawMatchResult,
+  drawMatchLoading,
+  onSaveDrawnWalk,
+  onDrawUndo,
   paths,
   walkedPathIds,
   hoveredPathId,
@@ -253,6 +270,14 @@ export default function SidePanel({
                 onClearAllSegments={onClearAllSegments}
                 onSaveComposedRoute={onSaveComposedRoute}
                 composerError={composerError}
+                drawingWalk={drawingWalk}
+                onStartDrawing={onStartDrawing}
+                onStopDrawing={onStopDrawing}
+                drawnVertexCount={drawnVertexCount}
+                drawMatchResult={drawMatchResult}
+                drawMatchLoading={drawMatchLoading}
+                onSaveDrawnWalk={onSaveDrawnWalk}
+                onDrawUndo={onDrawUndo}
               />
               <PathList
                 paths={paths}

@@ -59,6 +59,10 @@ interface PathMapProps {
   focusPathKey?: number;
   hoveredRouteId?: number | null;
   previewRoute?: RouteResponse | null;
+  drawingWalk?: boolean;
+  drawnVertices?: [number, number][];
+  onDrawVertex?: (coords: [number, number]) => void;
+  drawMatchedSegments?: PathFeatureCollection | null;
 }
 
 const PATH_DIMMED_STYLE: PathOptions = {
@@ -107,6 +111,19 @@ const SEGMENT_HOVER_STYLE: PathOptions = {
   color: "#6b7280",
   weight: 5,
   opacity: 0.8,
+};
+
+const DRAW_LINE_STYLE: PathOptions = {
+  color: "#f97316",
+  weight: 3,
+  opacity: 0.8,
+  dashArray: "8 6",
+};
+
+const DRAW_MATCHED_STYLE: PathOptions = {
+  color: "#f59e0b",
+  weight: 5,
+  opacity: 0.9,
 };
 
 const SEGMENT_REJECTED_STYLE: PathOptions = {
@@ -232,9 +249,11 @@ function FitBounds({ region, paths, route }: PathMapProps) {
     const fitTarget =
       route && route.segments.features.length > 0
         ? route.segments
-        : paths.features.length > 0
-          ? paths
-          : region.geometry;
+        : route?.custom_geometry
+          ? route.custom_geometry
+          : paths.features.length > 0
+            ? paths
+            : region.geometry;
 
     const bounds = L.geoJSON(fitTarget).getBounds();
     if (bounds.isValid()) {
@@ -380,6 +399,19 @@ function PointPickingHandler({
   useMapEvents({
     click: (e) => {
       onPickPoint([e.latlng.lng, e.latlng.lat]);
+    },
+  });
+  return null;
+}
+
+function DrawingClickHandler({
+  onDrawVertex,
+}: {
+  onDrawVertex: (coords: [number, number]) => void;
+}) {
+  useMapEvents({
+    click: (e) => {
+      onDrawVertex([e.latlng.lng, e.latlng.lat]);
     },
   });
   return null;
@@ -725,6 +757,10 @@ export default function PathMap({
   focusPathKey,
   hoveredRouteId,
   previewRoute,
+  drawingWalk,
+  drawnVertices,
+  onDrawVertex,
+  drawMatchedSegments,
 }: PathMapProps) {
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
@@ -746,7 +782,9 @@ export default function PathMap({
     return total;
   }, [measurePoints]);
 
-  const hasRoute = composing || (route && route.segments.features.length > 0);
+  const hasRoute = composing || (route && (route.segments.features.length > 0 || route.custom_geometry));
+  const isCustomOnlyRoute = !composing && route != null
+    && route.segments.features.length === 0 && route.custom_geometry != null;
   const totalSegments = hasRoute && route ? route.segments.features.length : 0;
   const layerMapRef = useRef<Map<number, L.Path>>(new Map());
   const routePathLayersRef = useRef<Map<string, { layer: L.Path; color: string }[]>>(new Map());
@@ -812,6 +850,8 @@ export default function PathMap({
   partiallyWalkedPathIdsRef.current = partiallyWalkedPathIds;
   const hasRouteRef = useRef(hasRoute);
   hasRouteRef.current = hasRoute;
+  const isCustomOnlyRouteRef = useRef(isCustomOnlyRoute);
+  isCustomOnlyRouteRef.current = isCustomOnlyRoute;
   const onPathHoverRef = useRef(onPathHover);
   onPathHoverRef.current = onPathHover;
   const siblingIdsMapRef = useRef(siblingIdsMap);
@@ -846,13 +886,13 @@ export default function PathMap({
   const hoveredPathIdRef = useRef<number | null>(null);
 
   function getBaseStyle(pathId: number): PathOptions {
-    if (hasRouteRef.current) return PATH_DIMMED_STYLE;
+    if (hasRouteRef.current && !isCustomOnlyRouteRef.current) return PATH_DIMMED_STYLE;
     const walked = walkedPathIdsRef.current?.has(pathId) ?? false;
     return walked ? WALKED_HIGHLIGHT_STYLE : UNWALKED_DIMMED_STYLE;
   }
 
   function getHoverStyle(pathId: number): PathOptions {
-    if (hasRouteRef.current) return PATH_DIMMED_STYLE;
+    if (hasRouteRef.current && !isCustomOnlyRouteRef.current) return PATH_DIMMED_STYLE;
     const partiallyWalked = partiallyWalkedPathIdsRef.current?.has(pathId) ?? false;
     if (partiallyWalked) return WALKED_HOVER_STYLE;
     return HOVER_STYLE;
@@ -1067,8 +1107,9 @@ export default function PathMap({
             }}
           />
         )}
-        {hasRoute && route && route.segments.features.length > 0 && (
+        {hasRoute && route && (
           <>
+            {route.segments.features.length > 0 && (
             <GeoJSON
               key={`route-${route.total_distance}`}
               data={route.segments}
@@ -1141,17 +1182,36 @@ export default function PathMap({
                 });
               }}
             />
+            )}
             <RouteMarkers route={route} />
+            {route?.custom_geometry && (
+              <Polyline
+                positions={route.custom_geometry.coordinates.map(
+                  ([lon, lat]) => [lat, lon] as [number, number]
+                )}
+                pathOptions={DRAW_LINE_STYLE}
+              />
+            )}
           </>
         )}
-        {previewRoute && previewRoute.segments.features.length > 0 && (
+        {previewRoute && (previewRoute.segments.features.length > 0 || previewRoute.custom_geometry) && (
           <>
-            <GeoJSON
-              key={`route-preview-${hoveredRouteId}`}
-              data={previewRoute.segments}
-              style={() => ROUTE_HOVER_STYLE}
-            />
+            {previewRoute.segments.features.length > 0 && (
+              <GeoJSON
+                key={`route-preview-${hoveredRouteId}`}
+                data={previewRoute.segments}
+                style={() => ROUTE_HOVER_STYLE}
+              />
+            )}
             <RouteMarkers route={previewRoute} />
+            {previewRoute?.custom_geometry && (
+              <Polyline
+                positions={previewRoute.custom_geometry.coordinates.map(
+                  ([lon, lat]) => [lat, lon] as [number, number]
+                )}
+                pathOptions={DRAW_LINE_STYLE}
+              />
+            )}
           </>
         )}
         {composing && segments && (
@@ -1191,6 +1251,35 @@ export default function PathMap({
                 },
               });
             }}
+          />
+        )}
+        {drawingWalk && onDrawVertex && (
+          <DrawingClickHandler onDrawVertex={onDrawVertex} />
+        )}
+        {drawingWalk && drawnVertices && drawnVertices.length >= 2 && (
+          <Polyline
+            positions={drawnVertices.map(([lon, lat]) => [lat, lon] as [number, number])}
+            pathOptions={DRAW_LINE_STYLE}
+          />
+        )}
+        {drawingWalk && drawnVertices && drawnVertices.map(([lon, lat], i) => (
+          <CircleMarker
+            key={`draw-vertex-${i}`}
+            center={[lat, lon]}
+            radius={4}
+            pathOptions={{
+              fillColor: "#f97316",
+              color: "#ffffff",
+              weight: 2,
+              fillOpacity: 1,
+            }}
+          />
+        ))}
+        {drawingWalk && drawMatchedSegments && drawMatchedSegments.features.length > 0 && (
+          <GeoJSON
+            key={`draw-matched-${drawMatchedSegments.features.map((f) => f.id).join(",")}`}
+            data={drawMatchedSegments as GeoJSON.FeatureCollection}
+            style={() => DRAW_MATCHED_STYLE}
           />
         )}
         {composing && composedStartPoint && composedEndPoint && (

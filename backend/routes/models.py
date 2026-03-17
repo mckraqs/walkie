@@ -3,6 +3,7 @@
 from typing import ClassVar
 
 from django.conf import settings
+from django.contrib.gis.db import models as gis_models
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
@@ -28,6 +29,7 @@ class Route(models.Model):
     is_loop = models.BooleanField(default=False)
     is_custom = models.BooleanField(default=False)
     walked = models.BooleanField(default=False)
+    custom_geometry = gis_models.LineStringField(srid=4326, null=True, blank=True)
     start_point = ArrayField(models.FloatField(), size=2, null=True, blank=True)
     end_point = ArrayField(models.FloatField(), size=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

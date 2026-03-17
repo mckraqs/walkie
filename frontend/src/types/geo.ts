@@ -107,6 +107,10 @@ export interface RouteResponse {
   paths_count: number;
   path_names: string[];
   used_shortest_path?: boolean;
+  custom_geometry?: {
+    type: "LineString";
+    coordinates: [number, number][];
+  } | null;
 }
 
 export interface WalkedPathsResponse {
@@ -168,6 +172,10 @@ export interface SaveRouteRequest {
   walked?: boolean;
   start_point: [number, number] | null;
   end_point: [number, number] | null;
+  custom_geometry?: {
+    type: "LineString";
+    coordinates: [number, number][];
+  } | null;
 }
 
 export interface SaveRouteResponse extends RouteListItem {
@@ -179,6 +187,21 @@ export interface SaveRouteResponse extends RouteListItem {
 
 export interface RouteRenameRequest {
   name: string;
+}
+
+export interface MatchGeometryRequest {
+  geometry: {
+    type: "LineString";
+    coordinates: [number, number][];
+  };
+}
+
+export interface MatchGeometryResponse {
+  matched_segment_ids: number[];
+  total_distance: number;
+  matched_count: number;
+  street_names: string[];
+  segments: PathFeatureCollection;
 }
 
 export interface RemoveFavoriteResponse {

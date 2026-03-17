@@ -6,6 +6,7 @@ from paths.views import RegionPathsListView, RegionSegmentsListView
 from places.views import PlaceDetailView, PlaceListCreateView
 from regions.views import RegionDetailView, RegionListView
 from routes.views import (
+    MatchGeometryView,
     RouteDetailView,
     RouteExportView,
     RouteGenerateView,
@@ -51,6 +52,11 @@ urlpatterns = [
         "<int:region_id>/places/<int:place_id>/",
         PlaceDetailView.as_view(),
         name="place-detail",
+    ),
+    path(
+        "<int:region_id>/routes/match-geometry/",
+        MatchGeometryView.as_view(),
+        name="route-match-geometry",
     ),
     path(
         "<int:region_id>/routes/generate/",

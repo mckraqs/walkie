@@ -1280,3 +1280,99 @@ def _pick_loop_waypoints(
 
     bearings.sort()
     return [node for _, node in bearings]
+
+
+# ---------------------------------------------------------------------------
+# Segment matching for custom (drawn) routes
+# ---------------------------------------------------------------------------
+
+MATCH_BUFFER_M = 15
+MATCH_OVERLAP_THRESHOLD = 0.75
+MATCH_SRID = 2180  # EPSG:2180 - Polish national projected CRS (meters)
+
+
+@dataclass(frozen=True)
+class MatchResult:
+    """Result of matching a drawn geometry to region segments."""
+
+    segment_ids: list[int]
+    total_distance: float  # meters
+    street_names: list[str]
+
+
+def match_segments_to_geometry(
+    region_id: int,
+    geojson: str,
+    *,
+    buffer_m: float = MATCH_BUFFER_M,
+    overlap_threshold: float = MATCH_OVERLAP_THRESHOLD,
+) -> MatchResult:
+    """Match a drawn LineString to nearby region segments.
+
+    Projects both the drawn geometry and segments to EPSG:2180 for accurate
+    meter-based buffer and intersection calculations.
+
+    Args:
+        region_id: Region to search segments in.
+        geojson: GeoJSON string of the drawn LineString.
+        buffer_m: Buffer distance in meters around the drawn line.
+        overlap_threshold: Minimum fraction of segment length that must
+            fall within the buffer to count as matched (0.0-1.0).
+
+    Returns:
+        MatchResult with matched segment IDs, total distance, and street names.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            WITH buffer AS (
+                SELECT ST_Buffer(
+                    ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), %s),
+                    %s
+                ) AS geom
+            )
+            SELECT s.id
+            FROM segments s, buffer b
+            WHERE s.region_id = %s
+              AND ST_Intersects(ST_Transform(s.geometry, %s), b.geom)
+              AND ST_Length(
+                      ST_Intersection(ST_Transform(s.geometry, %s), b.geom)
+                  ) / NULLIF(ST_Length(ST_Transform(s.geometry, %s)), 0)
+                  >= %s
+            """,
+            [
+                geojson,
+                MATCH_SRID,
+                buffer_m,
+                region_id,
+                MATCH_SRID,
+                MATCH_SRID,
+                MATCH_SRID,
+                overlap_threshold,
+            ],
+        )
+        segment_ids = [row[0] for row in cursor.fetchall()]
+
+    if not segment_ids:
+        return MatchResult(segment_ids=[], total_distance=0.0, street_names=[])
+
+    # Compute total distance of matched segments.
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT SUM(ST_Length(geometry::geography))
+            FROM segments
+            WHERE id = ANY(%s)
+            """,
+            [segment_ids],
+        )
+        row = cursor.fetchone()
+    total_distance = float(row[0]) if row and row[0] else 0.0
+
+    street_names = get_route_path_names(segment_ids)
+
+    return MatchResult(
+        segment_ids=segment_ids,
+        total_distance=total_distance,
+        street_names=street_names,
+    )

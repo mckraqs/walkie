@@ -11,6 +11,7 @@ import {
   deleteRoute,
   renameRoute,
   fetchRegionSegments,
+  matchGeometry,
 } from "@/lib/api";
 import { getRouteEndpoints } from "@/lib/geo";
 import SidePanel from "@/components/SidePanel";
@@ -28,6 +29,7 @@ import type {
   SegmentFeatureCollection,
   SegmentFeature,
   GeocodingResult,
+  MatchGeometryResponse,
 } from "@/types/geo";
 
 export interface TempPoint {
@@ -89,6 +91,14 @@ export default function RegionExplorer({
   const [composerError, setComposerError] = useState<string | null>(null);
   const [pendingDisconnectedSegment, setPendingDisconnectedSegment] = useState<number | null>(null);
 
+  // Draw walk state
+  const [drawingWalk, setDrawingWalk] = useState(false);
+  const [drawnVertices, setDrawnVertices] = useState<[number, number][]>([]);
+  const [drawMatchResult, setDrawMatchResult] = useState<MatchGeometryResponse | null>(null);
+  const [drawMatchLoading, setDrawMatchLoading] = useState(false);
+  const drawMatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawAbortRef = useRef<AbortController | null>(null);
+
   // Route hover preview state
   const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
   const [previewRoute, setPreviewRoute] = useState<RouteResponse | null>(null);
@@ -149,7 +159,7 @@ export default function RegionExplorer({
     if (!isFavorite) return;
     fetchSavedRoutes(regionId)
       .then(setSavedRoutes)
-      .catch(() => {});
+      .catch(() => showToast("Failed to load saved routes"));
   }, [regionId, isFavorite]);
 
   const handleSaveRoute = useCallback(
@@ -377,6 +387,125 @@ export default function RegionExplorer({
     }
   }, [placeCreationMode]);
 
+  // --- Draw walk handlers ---
+  const handleStartDrawing = useCallback(() => {
+    setDrawingWalk(true);
+    setDrawnVertices([]);
+    setDrawMatchResult(null);
+    setRoute(null);
+    setActiveRouteId(null);
+    setError(null);
+    setComposing(false);
+    setSegments(null);
+    setSelectedSegmentIds([]);
+    setPickingPoint(null);
+  }, []);
+
+  const handleStopDrawing = useCallback(() => {
+    setDrawingWalk(false);
+    setDrawnVertices([]);
+    setDrawMatchResult(null);
+    setDrawMatchLoading(false);
+    if (drawMatchTimerRef.current) clearTimeout(drawMatchTimerRef.current);
+    drawAbortRef.current?.abort();
+  }, []);
+
+  const triggerMatch = useCallback(
+    (vertices: [number, number][]) => {
+      if (vertices.length < 2) {
+        setDrawMatchResult(null);
+        return;
+      }
+      if (drawMatchTimerRef.current) clearTimeout(drawMatchTimerRef.current);
+      drawAbortRef.current?.abort();
+
+      drawMatchTimerRef.current = setTimeout(async () => {
+        const controller = new AbortController();
+        drawAbortRef.current = controller;
+        setDrawMatchLoading(true);
+        try {
+          const result = await matchGeometry(regionId, {
+            geometry: {
+              type: "LineString",
+              coordinates: vertices,
+            },
+          });
+          if (!controller.signal.aborted) {
+            setDrawMatchResult(result);
+          }
+        } catch {
+          // Silently ignore match errors during drawing
+        } finally {
+          if (!controller.signal.aborted) {
+            setDrawMatchLoading(false);
+          }
+        }
+      }, 300);
+    },
+    [regionId],
+  );
+
+  const handleDrawVertex = useCallback(
+    (coords: [number, number]) => {
+      setDrawnVertices((prev) => {
+        const next = [...prev, coords];
+        triggerMatch(next);
+        return next;
+      });
+    },
+    [triggerMatch],
+  );
+
+  const handleDrawUndo = useCallback(() => {
+    setDrawnVertices((prev) => {
+      const next = prev.slice(0, -1);
+      triggerMatch(next);
+      return next;
+    });
+  }, [triggerMatch]);
+
+  const handleSaveDrawnWalk = useCallback(
+    async (name: string) => {
+      const request: SaveRouteRequest = {
+        name,
+        segment_ids: drawMatchResult?.matched_segment_ids ?? [],
+        total_distance: drawMatchResult?.total_distance ?? 0,
+        is_loop: false,
+        is_custom: true,
+        walked: true,
+        start_point: null,
+        end_point: null,
+        custom_geometry: {
+          type: "LineString",
+          coordinates: drawnVertices,
+        },
+      };
+      const saved = await saveRoute(regionId, request);
+      setSavedRoutes((prev) => [saved, ...prev]);
+      if (saved.walked && saved.walked_path_ids) {
+        onWalkedChange(
+          saved.walked_path_ids,
+          saved.partially_walked_path_ids ?? [],
+          saved.total_paths!,
+          saved.walked_count!,
+        );
+      }
+      handleStopDrawing();
+    },
+    [regionId, drawMatchResult, drawnVertices, onWalkedChange, handleStopDrawing],
+  );
+
+  // When entering draw mode, exit other modes
+  useEffect(() => {
+    if (drawingWalk) {
+      setComposing(false);
+      setSegments(null);
+      setSelectedSegmentIds([]);
+      setComposerError(null);
+      setPickingPoint(null);
+    }
+  }, [drawingWalk]);
+
   // --- Composition: segment lookup map ---
   const segmentMap = useMemo(() => {
     if (!segments) return new Map<number, SegmentFeature>();
@@ -579,6 +708,14 @@ export default function RegionExplorer({
         onClearAllSegments={handleClearAllSegments}
         onSaveComposedRoute={handleSaveComposedRoute}
         composerError={composerError}
+        drawingWalk={drawingWalk}
+        onStartDrawing={handleStartDrawing}
+        onStopDrawing={handleStopDrawing}
+        drawnVertexCount={drawnVertices.length}
+        drawMatchResult={drawMatchResult}
+        drawMatchLoading={drawMatchLoading}
+        onSaveDrawnWalk={handleSaveDrawnWalk}
+        onDrawUndo={handleDrawUndo}
         paths={paths.features}
         walkedPathIds={walkedPathIds}
         hoveredPathId={hoveredPathId}
@@ -635,6 +772,10 @@ export default function RegionExplorer({
         focusPathKey={focusPathKey}
         hoveredRouteId={hoveredRouteId}
         previewRoute={previewRoute}
+        drawingWalk={drawingWalk}
+        drawnVertices={drawnVertices}
+        onDrawVertex={handleDrawVertex}
+        drawMatchedSegments={drawMatchResult?.segments ?? null}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog
