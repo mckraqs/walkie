@@ -90,14 +90,14 @@ const WALKED_HIGHLIGHT_STYLE: PathOptions = {
 };
 
 const UNWALKED_DIMMED_STYLE: PathOptions = {
-  color: "#60a5fa",
-  weight: 2,
+  color: "#3b82f6",
+  weight: 2.5,
   opacity: 0.8,
 };
 
 const ROUTE_HOVER_STYLE: PathOptions = {
   color: "#d97706",
-  weight: 5,
+  weight: 6,
   opacity: 1,
 };
 
@@ -1119,7 +1119,7 @@ export default function PathMap({
                 const color = getSegmentColor(seqIdx, totalSegments);
                 return {
                   color,
-                  weight: 4,
+                  weight: 5,
                   opacity: 0.9,
                   className: 'route-segment',
                 };
@@ -1166,7 +1166,7 @@ export default function PathMap({
                         for (const entry of group) {
                           entry.layer.setStyle({
                             color: entry.color,
-                            weight: 4,
+                            weight: 5,
                             opacity: 0.9,
                           });
                         }
@@ -1174,7 +1174,7 @@ export default function PathMap({
                     } else {
                       (layer as L.Path).setStyle({
                         color: segmentColor,
-                        weight: 4,
+                        weight: 5,
                         opacity: 0.9,
                       });
                     }
