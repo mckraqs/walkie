@@ -86,6 +86,7 @@ export default function Places({
       setRenaming(false);
       setRenamingId(null);
       setRenameValue("");
+      onPlaceHover(null);
     }
   }
 

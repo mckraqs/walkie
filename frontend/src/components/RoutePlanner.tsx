@@ -667,7 +667,7 @@ export default function RoutePlanner({
                 }}
                 className="w-full border-green-300 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/30"
               >
-                Save as Walked
+                Save Route
               </Button>
             )}
 

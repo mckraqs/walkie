@@ -111,11 +111,11 @@ export default function WalkHistory({
   return (
     <>
       <CollapsibleSection
-        title="Walk History"
+        title="My Walks"
         badge={drawingForWalk ? "(drawing)" : walks.length > 0 ? `(${walks.length})` : undefined}
-        collapsed={drawingForWalk ? false : collapsed}
+        collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        height={drawingForWalk ? "auto" : height}
+        height={height}
       >
         <div className="flex-1 overflow-y-auto p-3">
           {drawingForWalk ? (

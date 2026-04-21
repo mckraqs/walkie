@@ -110,8 +110,8 @@ export default function SavedRoutes({
                     onLoadRoute(route.id);
                   }
                 }}
-                onMouseEnter={() => onRouteHover(route.id)}
-                onMouseLeave={() => onRouteHover(null)}
+                onMouseEnter={() => { if (activeRouteId === null) onRouteHover(route.id); }}
+                onMouseLeave={() => { if (activeRouteId === null) onRouteHover(null); }}
                 className={`cursor-pointer rounded-md border px-2.5 py-2 text-sm transition-colors ${
                   activeRouteId === route.id
                     ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/30"

@@ -277,6 +277,8 @@ export default function RegionExplorer({
     setRoute(null);
     setActiveRouteId(null);
     setError(null);
+    setPreviewRoute(null);
+    setHoveredRouteId(null);
   }, []);
 
   const handleRouteHover = useCallback(
@@ -399,6 +401,7 @@ export default function RegionExplorer({
 
   const handleStopDrawing = useCallback(() => {
     setDrawingWalk(false);
+    setDrawingForWalk(false);
     setDrawnVertices([]);
     setDrawMatchResult(null);
     setDrawMatchLoading(false);
@@ -575,6 +578,11 @@ export default function RegionExplorer({
     },
     [regionId, onWalkedChange, showToast],
   );
+
+  const handleClearActiveWalk = useCallback(() => {
+    setActiveWalkId(null);
+    setActiveWalkGeometry(null);
+  }, []);
 
   const handleAddWalkByDrawing = useCallback(() => {
     setDrawingForWalk(true);
@@ -817,6 +825,7 @@ export default function RegionExplorer({
         onAddWalkFromRoute={handleAddWalkFromRoute}
         onAddWalkByDrawing={handleAddWalkByDrawing}
         drawingForWalk={drawingForWalk}
+        onClearActiveWalk={handleClearActiveWalk}
       />
       <PathMap
         region={region}

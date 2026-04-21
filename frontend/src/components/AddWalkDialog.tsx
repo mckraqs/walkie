@@ -77,18 +77,24 @@ export default function AddWalkDialog({
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="walk-route">Route</Label>
-            <Select value={routeId} onValueChange={setRouteId}>
-              <SelectTrigger id="walk-route">
-                <SelectValue placeholder="Select a route..." />
-              </SelectTrigger>
-              <SelectContent>
-                {savedRoutes.map((r) => (
-                  <SelectItem key={r.id} value={String(r.id)}>
-                    {r.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {savedRoutes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No saved routes. Create a route first in the Route Planner.
+              </p>
+            ) : (
+              <Select value={routeId} onValueChange={setRouteId}>
+                <SelectTrigger id="walk-route">
+                  <SelectValue placeholder="Select a route..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedRoutes.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="walk-name">Name</Label>
@@ -115,7 +121,7 @@ export default function AddWalkDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !routeId || !name.trim() || !walkedAt}
+            disabled={submitting || !routeId || !name.trim() || !walkedAt || savedRoutes.length === 0}
           >
             {submitting ? "Creating..." : "Create Walk"}
           </Button>

@@ -87,6 +87,7 @@ interface SidePanelProps {
   onAddWalkFromRoute: (data: { route_id: number; name: string; walked_at: string }) => void;
   onAddWalkByDrawing: () => void;
   drawingForWalk: boolean;
+  onClearActiveWalk: () => void;
 }
 
 export function computeSectionHeight(
@@ -176,6 +177,7 @@ export default function SidePanel({
   onAddWalkFromRoute,
   onAddWalkByDrawing,
   drawingForWalk,
+  onClearActiveWalk,
 }: SidePanelProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(true);
@@ -189,6 +191,12 @@ export default function SidePanel({
       setSavedRoutesCollapsed(true);
     }
   }, [composing]);
+
+  useEffect(() => {
+    if (drawingForWalk) {
+      setWalkHistoryCollapsed(false);
+    }
+  }, [drawingForWalk]);
 
   const savedRoutesHeight = isFavorite
     ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed, savedRoutesCollapsed)
@@ -258,7 +266,13 @@ export default function SidePanel({
                 onAddWalkFromRoute={onAddWalkFromRoute}
                 onAddWalkByDrawing={onAddWalkByDrawing}
                 collapsed={walkHistoryCollapsed}
-                onToggleCollapsed={() => setWalkHistoryCollapsed((c) => !c)}
+                onToggleCollapsed={() => {
+                  const willCollapse = !walkHistoryCollapsed;
+                  setWalkHistoryCollapsed((c) => !c);
+                  if (willCollapse) {
+                    onClearActiveWalk();
+                  }
+                }}
                 height={walkHistoryHeight}
                 drawingForWalk={drawingForWalk}
                 drawnVertexCount={drawnVertexCount}
@@ -279,7 +293,13 @@ export default function SidePanel({
                 onClearLoadedRoute={onClearLoadedRoute}
                 onRouteHover={onRouteHover}
                 collapsed={savedRoutesCollapsed}
-                onToggleCollapsed={() => setSavedRoutesCollapsed((c) => !c)}
+                onToggleCollapsed={() => {
+                  const willCollapse = !savedRoutesCollapsed;
+                  setSavedRoutesCollapsed((c) => !c);
+                  if (willCollapse) {
+                    onClearLoadedRoute();
+                  }
+                }}
                 height={savedRoutesHeight}
               />
               <RoutePlanner

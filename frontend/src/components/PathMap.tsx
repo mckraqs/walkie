@@ -174,7 +174,6 @@ function buildRouteTooltip(
     `<strong>${props.name || "Unnamed"}</strong>`,
     `Distance: ${distKm} km`,
     `Category: ${props.category}`,
-    `Surface: ${props.surface || "unknown"}`,
   ];
   if (props.sequence_index != null) {
     lines.push(`Segment ${props.sequence_index + 1} of ${total}`);
@@ -861,6 +860,8 @@ export default function PathMap({
   hasRouteRef.current = hasRoute;
   const isCustomOnlyRouteRef = useRef(isCustomOnlyRoute);
   isCustomOnlyRouteRef.current = isCustomOnlyRoute;
+  const routeRef = useRef(route);
+  routeRef.current = route;
   const onPathHoverRef = useRef(onPathHover);
   onPathHoverRef.current = onPathHover;
   const siblingIdsMapRef = useRef(siblingIdsMap);
@@ -1007,7 +1008,7 @@ export default function PathMap({
   );
 
   return (
-    <div className={`relative h-full w-full${isCreatingPlace || pickingPoint || measureActive ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
+    <div className={`relative h-full w-full overflow-hidden${isCreatingPlace || pickingPoint || measureActive ? " [&_.leaflet-container]:!cursor-crosshair" : ""}`}>
       <MapContainer
         center={[51.4, 21.1]}
         zoom={12}
@@ -1077,6 +1078,7 @@ export default function PathMap({
 
               layer.on({
                 mouseover: (e) => {
+                  if (routeRef.current) return;
                   clearTimeout(hideTimerRef.current);
                   hoveredPathIdRef.current = pathId;
                   (e.target as L.Path).setStyle(getHoverStyle(pathId));
@@ -1141,7 +1143,7 @@ export default function PathMap({
                 const pathFeature = feature as PathFeature;
                 layer.bindTooltip(
                   buildRouteTooltip(props, pathFeature.geometry, totalSegments),
-                  { sticky: true },
+                  { sticky: false, permanent: false },
                 );
 
                 const runKey = routeRunGroupMap.get(featureId);
@@ -1156,6 +1158,14 @@ export default function PathMap({
 
                 layer.on({
                   mouseover: () => {
+                    // Close all segment tooltips first
+                    routePathLayersRef.current.forEach((entries) => {
+                      for (const entry of entries) {
+                        entry.layer.closeTooltip();
+                      }
+                    });
+                    (layer as L.Path).openTooltip();
+
                     if (runKey != null) {
                       const group = routePathLayersRef.current.get(runKey);
                       if (group) {
@@ -1169,6 +1179,8 @@ export default function PathMap({
                     }
                   },
                   mouseout: () => {
+                    (layer as L.Path).closeTooltip();
+
                     if (runKey != null) {
                       const group = routePathLayersRef.current.get(runKey);
                       if (group) {
@@ -1336,12 +1348,6 @@ export default function PathMap({
           </div>
           <div className="text-muted-foreground">
             Category: {tooltipData.props.category}
-          </div>
-          <div className="text-muted-foreground">
-            Surface: {tooltipData.props.surface || "unknown"}
-          </div>
-          <div className="text-muted-foreground">
-            Lit: {tooltipData.props.is_lit ? "Yes" : "No"}
           </div>
         </div>
       )}
