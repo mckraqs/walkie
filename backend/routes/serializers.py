@@ -85,7 +85,6 @@ class RouteCreateSerializer(serializers.Serializer):
     total_distance = serializers.FloatField(min_value=0)
     is_loop = serializers.BooleanField(default=False)
     is_custom = serializers.BooleanField(default=False)
-    walked = serializers.BooleanField(default=False)
     start_point = serializers.ListField(
         child=serializers.FloatField(),
         min_length=2,
@@ -128,7 +127,6 @@ class RouteListItemSerializer(serializers.Serializer):
     total_distance = serializers.FloatField(read_only=True)
     is_loop = serializers.BooleanField(read_only=True)
     is_custom = serializers.BooleanField(read_only=True)
-    walked = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
 
 

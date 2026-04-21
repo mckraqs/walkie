@@ -62,8 +62,9 @@ interface RoutePlannerProps {
   drawnVertexCount: number;
   drawMatchResult: MatchGeometryResponse | null;
   drawMatchLoading: boolean;
-  onSaveDrawnWalk: (name: string) => Promise<void>;
+  onSaveDrawnWalk: (name: string, walkedAt?: string) => Promise<void>;
   onDrawUndo: () => void;
+  drawingForWalk: boolean;
 }
 
 export default function RoutePlanner({
@@ -102,6 +103,7 @@ export default function RoutePlanner({
   drawMatchLoading,
   onSaveDrawnWalk,
   onDrawUndo,
+  drawingForWalk,
 }: RoutePlannerProps) {
   const [mode, setMode] = useState<PlannerMode>("initial");
   const [distance, setDistance] = useState("3");
@@ -112,18 +114,17 @@ export default function RoutePlanner({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [routeName, setRouteName] = useState("");
-  const [markedWalked, setMarkedWalked] = useState(false);
 
   // Sync mode with external composing/drawing props
   useEffect(() => {
-    if (drawingWalk) {
+    if (drawingWalk && !drawingForWalk) {
       setMode("drawing");
     } else if (composing) {
       setMode("composing");
     } else if (mode === "composing" || mode === "drawing") {
       setMode("initial");
     }
-  }, [composing, drawingWalk]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [composing, drawingWalk, drawingForWalk]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset save-related state on mode change or when route is cleared/set
   useEffect(() => {
@@ -131,7 +132,6 @@ export default function RoutePlanner({
     setSaveError(null);
     setRouteName("");
     setSaving(false);
-    setMarkedWalked(false);
   }, [mode, route]);
 
   useEffect(() => {
@@ -348,14 +348,6 @@ export default function RoutePlanner({
         disabled={saving}
         placeholder="Route name"
       />
-      <label className="flex cursor-pointer items-center gap-2">
-        <Checkbox
-          checked={markedWalked}
-          onCheckedChange={(checked) => setMarkedWalked(!!checked)}
-          disabled={saving}
-        />
-        <span className="text-sm font-medium">Already walked</span>
-      </label>
       <div className="flex gap-1">
         <Button
           size="sm"
@@ -370,7 +362,6 @@ export default function RoutePlanner({
                   segment_ids: route.segments.features.map((f) => f.id),
                   total_distance: route.total_distance,
                   is_loop: route.is_loop,
-                  walked: markedWalked,
                   start_point: route.start_point,
                   end_point: route.end_point,
                 });
@@ -383,7 +374,6 @@ export default function RoutePlanner({
                   total_distance: composedTotalDistance,
                   is_loop: composedIsLoop,
                   is_custom: true,
-                  walked: markedWalked,
                   start_point: null,
                   end_point: null,
                 });

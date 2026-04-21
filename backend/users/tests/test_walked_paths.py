@@ -1,5 +1,7 @@
 """Tests for the walked-paths segment-coverage formula and views."""
 
+from datetime import date
+
 import pytest
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
@@ -7,8 +9,8 @@ from rest_framework.test import APIClient
 
 from paths.models import Path, PathSegment, Segment
 from regions.models import Region
-from routes.models import Route
 from users.models import FavoriteRegion
+from walks.models import Walk
 
 SAMPLE_POLYGON_WKT = (
     "MULTIPOLYGON(((20.0 50.0, 21.0 50.0, 21.0 51.0, 20.0 51.0, 20.0 50.0)))"
@@ -124,13 +126,14 @@ class TestGetWalkedPathIds:
             "Path A",
             [[(20.0, 50.0), (20.5, 50.5)], [(20.5, 50.5), (21.0, 51.0)]],
         )
-        Route.objects.create(
+        Walk.objects.create(
             user=user,
             region=region,
-            name="Route 1",
+            name="Walk 1",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.5 50.5)", srid=4326),
             segment_ids=[s.pk for s in segments],
-            total_distance=1000,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=1000.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -153,14 +156,15 @@ class TestGetWalkedPathIds:
             "Path A",
             [[(20.0, 50.0), (20.5, 50.5)], [(20.5, 50.5), (21.0, 51.0)]],
         )
-        # Route covers only the first segment (50% of path)
-        Route.objects.create(
+        # Walk covers only the first segment (50% of path)
+        Walk.objects.create(
             user=user,
             region=region,
-            name="Route 1",
+            name="Walk 1",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.5 50.5)", srid=4326),
             segment_ids=[segments[0].pk],
-            total_distance=500,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=500.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -186,14 +190,15 @@ class TestGetWalkedPathIds:
                 [(20.5, 50.5), (21.0, 51.0)],
             ],
         )
-        # Route covers only the short first segment (well below 50%)
-        Route.objects.create(
+        # Walk covers only the short first segment (well below 50%)
+        Walk.objects.create(
             user=user,
             region=region,
-            name="Route 1",
+            name="Walk 1",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.1 50.1)", srid=4326),
             segment_ids=[segments[0].pk],
-            total_distance=100,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=100.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -221,23 +226,25 @@ class TestGetWalkedPathIds:
                 [(20.6, 50.6), (21.0, 51.0)],
             ],
         )
-        # Route 1 covers segment 0
-        Route.objects.create(
+        # Walk 1 covers segment 0
+        Walk.objects.create(
             user=user,
             region=region,
-            name="Route 1",
+            name="Walk 1",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.3 50.3)", srid=4326),
             segment_ids=[segments[0].pk],
-            total_distance=300,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=300.0,
         )
-        # Route 2 covers segments 0 and 1 (segment 0 is duplicated)
-        Route.objects.create(
+        # Walk 2 covers segments 0 and 1 (segment 0 is duplicated)
+        Walk.objects.create(
             user=user,
             region=region,
-            name="Route 2",
+            name="Walk 2",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.6 50.6)", srid=4326),
             segment_ids=[segments[0].pk, segments[1].pk],
-            total_distance=600,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=600.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -245,33 +252,6 @@ class TestGetWalkedPathIds:
         # Coverage: segments 0 + 1 out of 3 - roughly 2/3 >= 50%
         assert response.status_code == 200
         assert path.pk in response.json()["walked_path_ids"]
-
-    def test_unwalked_routes_dont_contribute(
-        self,
-        auth_client: APIClient,
-        user: User,
-        region: Region,
-        favorite: FavoriteRegion,
-    ) -> None:
-        """Only routes with walked=True contribute to coverage."""
-        path, segments = _create_path_with_segments(
-            region,
-            "Path A",
-            [[(20.0, 50.0), (21.0, 51.0)]],
-        )
-        Route.objects.create(
-            user=user,
-            region=region,
-            name="Route 1",
-            segment_ids=[s.pk for s in segments],
-            total_distance=1000,
-            walked=False,
-        )
-
-        response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
-
-        assert response.status_code == 200
-        assert path.pk not in response.json()["walked_path_ids"]
 
     def test_cross_region_isolation(
         self,
@@ -293,13 +273,14 @@ class TestGetWalkedPathIds:
             [[(22.0, 52.0), (23.0, 53.0)]],
         )
         # Walk the other region's segments - shouldn't affect primary region
-        Route.objects.create(
+        Walk.objects.create(
             user=user,
             region=other_region,
-            name="Other Route",
+            name="Other Walk",
+            geometry=GEOSGeometry("LINESTRING(22.0 52.0, 23.0 53.0)", srid=4326),
             segment_ids=[s.pk for s in other_segments],
-            total_distance=1000,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=1000.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -330,13 +311,14 @@ class TestGetWalkedPathIds:
             [[(20.3, 50.3), (20.6, 50.6)]],
         )
         # Walk all segments of path_a (50% of total "Komunalna" length)
-        Route.objects.create(
+        Walk.objects.create(
             user=user,
             region=region,
             name="Walk",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.3 50.3)", srid=4326),
             segment_ids=[s.pk for s in segs_a],
-            total_distance=500,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=500.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -367,13 +349,14 @@ class TestGetWalkedPathIds:
             [[(20.1, 50.1), (20.5, 50.5)], [(20.5, 50.5), (21.0, 51.0)]],
         )
         # Walk only the short first sibling - well below 50% of total
-        Route.objects.create(
+        Walk.objects.create(
             user=user,
             region=region,
             name="Walk",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.1 50.1)", srid=4326),
             segment_ids=[s.pk for s in segs_a],
-            total_distance=100,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=100.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -406,13 +389,14 @@ class TestGetWalkedPathIds:
             [[(20.5, 50.5), (21.0, 51.0)]],
         )
         # Walk only path_a's segments
-        Route.objects.create(
+        Walk.objects.create(
             user=user,
             region=region,
             name="Walk",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.5 50.5)", srid=4326),
             segment_ids=[s.pk for s in segs_a],
-            total_distance=500,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=500.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")
@@ -440,13 +424,14 @@ class TestGetWalkedPathIds:
         path, segments = _create_path_with_segments(region, "Long Street", coords)
 
         # Walk only the first segment - 10% coverage, well below 50%
-        Route.objects.create(
+        Walk.objects.create(
             user=user,
             region=region,
             name="Short Walk",
+            geometry=GEOSGeometry("LINESTRING(20.0 50.0, 20.07 50.0)", srid=4326),
             segment_ids=[segments[0].pk],
-            total_distance=100,
-            walked=True,
+            walked_at=date(2026, 4, 1),
+            distance=100.0,
         )
 
         response = auth_client.get(f"/api/regions/{region.pk}/paths/walked/")

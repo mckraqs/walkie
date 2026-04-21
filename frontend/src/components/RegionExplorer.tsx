@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   generateRoute,
-  toggleRouteWalked,
   saveRoute,
   fetchSavedRoutes,
   loadRoute,
@@ -12,6 +11,11 @@ import {
   renameRoute,
   fetchRegionSegments,
   matchGeometry,
+  fetchWalks,
+  createWalk,
+  fetchWalk,
+  deleteWalk as apiDeleteWalk,
+  renameWalk as apiRenameWalk,
 } from "@/lib/api";
 import { getRouteEndpoints } from "@/lib/geo";
 import SidePanel from "@/components/SidePanel";
@@ -30,6 +34,7 @@ import type {
   SegmentFeature,
   GeocodingResult,
   MatchGeometryResponse,
+  WalkListItem,
 } from "@/types/geo";
 
 export interface TempPoint {
@@ -99,6 +104,12 @@ export default function RegionExplorer({
   const drawMatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawAbortRef = useRef<AbortController | null>(null);
 
+  // Walk history state
+  const [walks, setWalks] = useState<WalkListItem[]>([]);
+  const [activeWalkId, setActiveWalkId] = useState<number | null>(null);
+  const [activeWalkGeometry, setActiveWalkGeometry] = useState<{ type: "LineString"; coordinates: [number, number][] } | null>(null);
+  const [drawingForWalk, setDrawingForWalk] = useState(false);
+
   // Route hover preview state
   const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
   const [previewRoute, setPreviewRoute] = useState<RouteResponse | null>(null);
@@ -160,17 +171,17 @@ export default function RegionExplorer({
     fetchSavedRoutes(regionId)
       .then(setSavedRoutes)
       .catch(() => showToast("Failed to load saved routes"));
+    fetchWalks(regionId)
+      .then(setWalks)
+      .catch(() => showToast("Failed to load walks"));
   }, [regionId, isFavorite]);
 
   const handleSaveRoute = useCallback(
     async (request: SaveRouteRequest) => {
       const saved = await saveRoute(regionId, request);
       setSavedRoutes((prev) => [saved, ...prev]);
-      if (saved.walked && saved.walked_path_ids) {
-        onWalkedChange(saved.walked_path_ids, saved.partially_walked_path_ids ?? [], saved.total_paths!, saved.walked_count!);
-      }
     },
-    [regionId, onWalkedChange],
+    [regionId],
   );
 
   const handleLoadRoute = useCallback(
@@ -260,21 +271,6 @@ export default function RegionExplorer({
       setSavedRoutes((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     },
     [regionId],
-  );
-
-  const handleToggleRouteWalked = useCallback(
-    async (routeId: number) => {
-      try {
-        const result = await toggleRouteWalked(regionId, routeId);
-        setSavedRoutes((prev) =>
-          prev.map((r) => (r.id === result.id ? { ...r, walked: result.walked } : r)),
-        );
-        onWalkedChange(result.walked_path_ids, result.partially_walked_path_ids, result.total_paths, result.walked_count);
-      } catch {
-        // Silently handle
-      }
-    },
-    [regionId, onWalkedChange],
   );
 
   const handleClearLoadedRoute = useCallback(() => {
@@ -465,34 +461,42 @@ export default function RegionExplorer({
   }, [triggerMatch]);
 
   const handleSaveDrawnWalk = useCallback(
-    async (name: string) => {
-      const request: SaveRouteRequest = {
-        name,
-        segment_ids: drawMatchResult?.matched_segment_ids ?? [],
-        total_distance: drawMatchResult?.total_distance ?? 0,
-        is_loop: false,
-        is_custom: true,
-        walked: true,
-        start_point: null,
-        end_point: null,
-        custom_geometry: {
-          type: "LineString",
-          coordinates: drawnVertices,
-        },
-      };
-      const saved = await saveRoute(regionId, request);
-      setSavedRoutes((prev) => [saved, ...prev]);
-      if (saved.walked && saved.walked_path_ids) {
-        onWalkedChange(
-          saved.walked_path_ids,
-          saved.partially_walked_path_ids ?? [],
-          saved.total_paths!,
-          saved.walked_count!,
-        );
+    async (name: string, walkedAt?: string) => {
+      if (drawingForWalk) {
+        // Create a Walk record with drawn geometry
+        const dateStr = walkedAt ?? new Date().toISOString().slice(0, 10);
+        const result = await createWalk(regionId, {
+          name,
+          walked_at: dateStr,
+          geometry: {
+            type: "LineString",
+            coordinates: drawnVertices,
+          },
+        });
+        setWalks((prev) => [result, ...prev]);
+        onWalkedChange(result.walked_path_ids, result.partially_walked_path_ids, result.total_paths, result.walked_count);
+        setDrawingForWalk(false);
+      } else {
+        // Create a Route record (original behavior)
+        const request: SaveRouteRequest = {
+          name,
+          segment_ids: drawMatchResult?.matched_segment_ids ?? [],
+          total_distance: drawMatchResult?.total_distance ?? 0,
+          is_loop: false,
+          is_custom: true,
+          start_point: null,
+          end_point: null,
+          custom_geometry: {
+            type: "LineString",
+            coordinates: drawnVertices,
+          },
+        };
+        const saved = await saveRoute(regionId, request);
+        setSavedRoutes((prev) => [saved, ...prev]);
       }
       handleStopDrawing();
     },
-    [regionId, drawMatchResult, drawnVertices, onWalkedChange, handleStopDrawing],
+    [regionId, drawMatchResult, drawnVertices, onWalkedChange, handleStopDrawing, drawingForWalk],
   );
 
   // When entering draw mode, exit other modes
@@ -505,6 +509,77 @@ export default function RegionExplorer({
       setPickingPoint(null);
     }
   }, [drawingWalk]);
+
+  // --- Walk handlers ---
+  const handleLoadWalk = useCallback(
+    async (walkId: number) => {
+      if (activeWalkId === walkId) {
+        setActiveWalkId(null);
+        setActiveWalkGeometry(null);
+        return;
+      }
+      try {
+        const detail = await fetchWalk(regionId, walkId);
+        setActiveWalkId(detail.id);
+        setActiveWalkGeometry(detail.geometry);
+      } catch {
+        showToast("Failed to load walk");
+      }
+    },
+    [regionId, activeWalkId, showToast],
+  );
+
+  const handleDeleteWalk = useCallback(
+    async (walkId: number) => {
+      await apiDeleteWalk(regionId, walkId);
+      setWalks((prev) => prev.filter((w) => w.id !== walkId));
+      if (activeWalkId === walkId) {
+        setActiveWalkId(null);
+        setActiveWalkGeometry(null);
+      }
+      // Refresh walked paths after deletion
+      fetchWalks(regionId).catch(() => {});
+      // Re-fetch walked path status
+      const { fetchWalkedPaths } = await import("@/lib/api");
+      try {
+        const data = await fetchWalkedPaths(regionId);
+        onWalkedChange(data.walked_path_ids, data.partially_walked_path_ids, data.total_paths, data.walked_count);
+      } catch {
+        // Silently handle
+      }
+    },
+    [regionId, activeWalkId, onWalkedChange],
+  );
+
+  const handleRenameWalk = useCallback(
+    async (walkId: number, name: string) => {
+      const updated = await apiRenameWalk(regionId, walkId, name);
+      setWalks((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+    },
+    [regionId],
+  );
+
+  const handleAddWalkFromRoute = useCallback(
+    async (data: { route_id: number; name: string; walked_at: string }) => {
+      try {
+        const result = await createWalk(regionId, {
+          name: data.name,
+          walked_at: data.walked_at,
+          route_id: data.route_id,
+        });
+        setWalks((prev) => [result, ...prev]);
+        onWalkedChange(result.walked_path_ids, result.partially_walked_path_ids, result.total_paths, result.walked_count);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Failed to create walk");
+      }
+    },
+    [regionId, onWalkedChange, showToast],
+  );
+
+  const handleAddWalkByDrawing = useCallback(() => {
+    setDrawingForWalk(true);
+    handleStartDrawing();
+  }, [handleStartDrawing]);
 
   // --- Composition: segment lookup map ---
   const segmentMap = useMemo(() => {
@@ -662,11 +737,8 @@ export default function RegionExplorer({
       };
       const saved = await saveRoute(regionId, fullRequest);
       setSavedRoutes((prev) => [saved, ...prev]);
-      if (saved.walked && saved.walked_path_ids) {
-        onWalkedChange(saved.walked_path_ids, saved.partially_walked_path_ids ?? [], saved.total_paths!, saved.walked_count!);
-      }
     },
-    [regionId, selectedSegmentIds, composedTotalDistance, composedIsLoop, composedStartPoint, composedEndPoint, onWalkedChange],
+    [regionId, selectedSegmentIds, composedTotalDistance, composedIsLoop, composedStartPoint, composedEndPoint],
   );
 
   // When generating/loading a route, exit compose mode
@@ -695,7 +767,6 @@ export default function RegionExplorer({
         onDeleteRoute={handleDeleteRoute}
         activeRouteId={activeRouteId}
         onRenameRoute={handleRenameRoute}
-        onToggleRouteWalked={handleToggleRouteWalked}
         onClearLoadedRoute={handleClearLoadedRoute}
         onRouteHover={handleRouteHover}
         composing={composing}
@@ -738,6 +809,14 @@ export default function RegionExplorer({
         onSearchResultHover={handleSearchResultHover}
         onSearchResultSelect={handleSearchResultSelect}
         onSaveSearchResult={handleSaveSearchResult}
+        walks={walks}
+        activeWalkId={activeWalkId}
+        onLoadWalk={handleLoadWalk}
+        onDeleteWalk={handleDeleteWalk}
+        onRenameWalk={handleRenameWalk}
+        onAddWalkFromRoute={handleAddWalkFromRoute}
+        onAddWalkByDrawing={handleAddWalkByDrawing}
+        drawingForWalk={drawingForWalk}
       />
       <PathMap
         region={region}
@@ -776,6 +855,7 @@ export default function RegionExplorer({
         drawnVertices={drawnVertices}
         onDrawVertex={handleDrawVertex}
         drawMatchedSegments={drawMatchResult?.segments ?? null}
+        activeWalkGeometry={activeWalkGeometry}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog

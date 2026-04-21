@@ -15,12 +15,15 @@ import type {
   RouteListItem,
   SaveRouteRequest,
   RouteRenameRequest,
-  RouteWalkToggleResponse,
   SaveRouteResponse,
   RemoveFavoriteResponse,
   GeocodingResult,
   MatchGeometryRequest,
   MatchGeometryResponse,
+  WalkListItem,
+  WalkDetail,
+  CreateWalkRequest,
+  CreateWalkResponse,
 } from "@/types/geo";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -363,20 +366,95 @@ export async function renameRoute(
   return res.json();
 }
 
-export async function toggleRouteWalked(
+export async function fetchWalks(
   regionId: string,
-  routeId: number,
-): Promise<RouteWalkToggleResponse> {
+): Promise<WalkListItem[]> {
   const res = await fetch(
-    `${API_URL}/api/regions/${regionId}/routes/saved/${routeId}/walk/`,
+    `${API_URL}/api/regions/${regionId}/walks/`,
     {
-      method: "POST",
+      cache: "no-store",
       headers: authHeaders(),
     },
   );
   handle401(res);
   if (!res.ok) {
-    throw new Error(`Failed to toggle route walked: ${res.status}`);
+    throw new Error(`Failed to fetch walks: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function createWalk(
+  regionId: string,
+  request: CreateWalkRequest,
+): Promise<CreateWalkResponse> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/walks/`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(request),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to create walk: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchWalk(
+  regionId: string,
+  walkId: number,
+): Promise<WalkDetail> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/walks/${walkId}/`,
+    {
+      cache: "no-store",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch walk: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteWalk(
+  regionId: string,
+  walkId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/walks/${walkId}/`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    throw new Error(`Failed to delete walk: ${res.status}`);
+  }
+}
+
+export async function renameWalk(
+  regionId: string,
+  walkId: number,
+  name: string,
+): Promise<WalkListItem> {
+  const res = await fetch(
+    `${API_URL}/api/regions/${regionId}/walks/${walkId}/`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ name }),
+    },
+  );
+  handle401(res);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Failed to rename walk: ${res.status}`);
   }
   return res.json();
 }

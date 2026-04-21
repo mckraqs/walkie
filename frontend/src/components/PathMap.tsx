@@ -63,6 +63,7 @@ interface PathMapProps {
   drawnVertices?: [number, number][];
   onDrawVertex?: (coords: [number, number]) => void;
   drawMatchedSegments?: PathFeatureCollection | null;
+  activeWalkGeometry?: { type: "LineString"; coordinates: [number, number][] } | null;
 }
 
 const PATH_DIMMED_STYLE: PathOptions = {
@@ -117,6 +118,13 @@ const DRAW_LINE_STYLE: PathOptions = {
   color: "#f97316",
   weight: 3,
   opacity: 0.8,
+  dashArray: "8 6",
+};
+
+const WALK_GEOMETRY_STYLE: PathOptions = {
+  color: "#22c55e",
+  weight: 4,
+  opacity: 0.9,
   dashArray: "8 6",
 };
 
@@ -761,6 +769,7 @@ export default function PathMap({
   drawnVertices,
   onDrawVertex,
   drawMatchedSegments,
+  activeWalkGeometry,
 }: PathMapProps) {
   const [measureActive, setMeasureActive] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<L.LatLng[]>([]);
@@ -1275,11 +1284,19 @@ export default function PathMap({
             }}
           />
         ))}
-        {drawingWalk && drawMatchedSegments && drawMatchedSegments.features.length > 0 && (
+        {drawingWalk && drawMatchedSegments && drawMatchedSegments.features && drawMatchedSegments.features.length > 0 && (
           <GeoJSON
             key={`draw-matched-${drawMatchedSegments.features.map((f) => f.id).join(",")}`}
             data={drawMatchedSegments as GeoJSON.FeatureCollection}
             style={() => DRAW_MATCHED_STYLE}
+          />
+        )}
+        {activeWalkGeometry && (
+          <Polyline
+            positions={activeWalkGeometry.coordinates.map(
+              ([lon, lat]) => [lat, lon] as [number, number]
+            )}
+            pathOptions={WALK_GEOMETRY_STYLE}
           />
         )}
         {composing && composedStartPoint && composedEndPoint && (

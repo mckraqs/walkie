@@ -5,7 +5,6 @@ import { Pencil, Check, X } from "lucide-react";
 import { downloadRouteFile } from "@/lib/gpx";
 import { formatDistance } from "@/lib/geo";
 import CollapsibleSection from "@/components/collapsible-section";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +24,6 @@ interface SavedRoutesProps {
   onLoadRoute: (routeId: number) => void;
   onDeleteRoute: (routeId: number) => Promise<void>;
   onRenameRoute: (routeId: number, name: string) => Promise<void>;
-  onToggleWalked: (routeId: number) => void;
   onClearLoadedRoute: () => void;
   onRouteHover: (routeId: number | null) => void;
   collapsed: boolean;
@@ -41,7 +39,6 @@ export default function SavedRoutes({
   onLoadRoute,
   onDeleteRoute,
   onRenameRoute,
-  onToggleWalked,
   onClearLoadedRoute,
   onRouteHover,
   collapsed,
@@ -88,7 +85,7 @@ export default function SavedRoutes({
       title="My Routes"
       badge={
         savedRoutes.length > 0
-          ? `(${savedRoutes.filter((r) => r.walked).length}/${savedRoutes.length} walked)`
+          ? `(${savedRoutes.length})`
           : undefined
       }
       collapsed={collapsed}
@@ -160,15 +157,6 @@ export default function SavedRoutes({
                       <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
                         {route.name}
                       </span>
-                      <Checkbox
-                        checked={route.walked}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleWalked(route.id);
-                        }}
-                        className="h-3.5 w-3.5 shrink-0"
-                        title={route.walked ? "Mark as not walked" : "Mark as walked"}
-                      />
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button

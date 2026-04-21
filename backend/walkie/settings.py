@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "routes",
     "users",
     "places",
+    "walks",
 ]
 
 MIDDLEWARE = [

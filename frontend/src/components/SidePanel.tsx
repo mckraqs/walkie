@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SavedRoutes from "@/components/SavedRoutes";
+import WalkHistory from "@/components/WalkHistory";
 import RoutePlanner from "@/components/RoutePlanner";
 import Places from "@/components/Places";
 import PathList from "@/components/PathList";
@@ -17,6 +18,7 @@ import type {
   PathFeature,
   GeocodingResult,
   MatchGeometryResponse,
+  WalkListItem,
 } from "@/types/geo";
 
 const HEADER = "2.75rem";
@@ -35,7 +37,6 @@ interface SidePanelProps {
   onDeleteRoute: (routeId: number) => Promise<void>;
   activeRouteId: number | null;
   onRenameRoute: (routeId: number, name: string) => Promise<void>;
-  onToggleRouteWalked: (routeId: number) => void;
   onClearLoadedRoute: () => void;
   onRouteHover: (routeId: number | null) => void;
   composing: boolean;
@@ -54,7 +55,7 @@ interface SidePanelProps {
   drawnVertexCount: number;
   drawMatchResult: MatchGeometryResponse | null;
   drawMatchLoading: boolean;
-  onSaveDrawnWalk: (name: string) => Promise<void>;
+  onSaveDrawnWalk: (name: string, walkedAt?: string) => Promise<void>;
   onDrawUndo: () => void;
   paths: PathFeature[];
   walkedPathIds: Set<number>;
@@ -78,6 +79,14 @@ interface SidePanelProps {
   onSearchResultHover: (location: [number, number] | null) => void;
   onSearchResultSelect: (result: GeocodingResult) => void;
   onSaveSearchResult: (name: string, location: [number, number]) => void;
+  walks: WalkListItem[];
+  activeWalkId: number | null;
+  onLoadWalk: (walkId: number) => void;
+  onDeleteWalk: (walkId: number) => Promise<void>;
+  onRenameWalk: (walkId: number, name: string) => Promise<void>;
+  onAddWalkFromRoute: (data: { route_id: number; name: string; walked_at: string }) => void;
+  onAddWalkByDrawing: () => void;
+  drawingForWalk: boolean;
 }
 
 export function computeSectionHeight(
@@ -85,11 +94,12 @@ export function computeSectionHeight(
   routePlannerCollapsed: boolean,
   placesCollapsed: boolean,
   pathListCollapsed: boolean,
+  walkHistoryCollapsed: boolean,
   isCollapsed: boolean,
 ): string {
-  const sections = [savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed];
+  const sections = [savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed];
   const collapsedCount = sections.filter(Boolean).length;
-  const expandedCount = 4 - collapsedCount;
+  const expandedCount = 5 - collapsedCount;
 
   if (isCollapsed) {
     return HEADER;
@@ -116,7 +126,6 @@ export default function SidePanel({
   onDeleteRoute,
   activeRouteId,
   onRenameRoute,
-  onToggleRouteWalked,
   onClearLoadedRoute,
   onRouteHover,
   composing,
@@ -159,12 +168,21 @@ export default function SidePanel({
   onSearchResultHover,
   onSearchResultSelect,
   onSaveSearchResult,
+  walks,
+  activeWalkId,
+  onLoadWalk,
+  onDeleteWalk,
+  onRenameWalk,
+  onAddWalkFromRoute,
+  onAddWalkByDrawing,
+  drawingForWalk,
 }: SidePanelProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [savedRoutesCollapsed, setSavedRoutesCollapsed] = useState(true);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(true);
   const [placesCollapsed, setPlacesCollapsed] = useState(true);
   const [pathListCollapsed, setPathListCollapsed] = useState(true);
+  const [walkHistoryCollapsed, setWalkHistoryCollapsed] = useState(true);
 
   useEffect(() => {
     if (composing) {
@@ -173,16 +191,19 @@ export default function SidePanel({
   }, [composing]);
 
   const savedRoutesHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, savedRoutesCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed, savedRoutesCollapsed)
     : "0";
   const rpHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, routePlannerCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed, routePlannerCollapsed)
     : "0";
   const placesHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, placesCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed, placesCollapsed)
     : "0";
   const pathListHeight = isFavorite
-    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, pathListCollapsed)
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed, pathListCollapsed)
+    : "0";
+  const walkHistoryHeight = isFavorite
+    ? computeSectionHeight(savedRoutesCollapsed, routePlannerCollapsed, placesCollapsed, pathListCollapsed, walkHistoryCollapsed, walkHistoryCollapsed)
     : "0";
 
   return (
@@ -227,6 +248,26 @@ export default function SidePanel({
                 onSearchResultSelect={onSearchResultSelect}
                 onSaveSearchResult={onSaveSearchResult}
               />
+              <WalkHistory
+                walks={walks}
+                savedRoutes={savedRoutes}
+                activeWalkId={activeWalkId}
+                onLoadWalk={onLoadWalk}
+                onDeleteWalk={onDeleteWalk}
+                onRenameWalk={onRenameWalk}
+                onAddWalkFromRoute={onAddWalkFromRoute}
+                onAddWalkByDrawing={onAddWalkByDrawing}
+                collapsed={walkHistoryCollapsed}
+                onToggleCollapsed={() => setWalkHistoryCollapsed((c) => !c)}
+                height={walkHistoryHeight}
+                drawingForWalk={drawingForWalk}
+                drawnVertexCount={drawnVertexCount}
+                drawMatchResult={drawMatchResult}
+                drawMatchLoading={drawMatchLoading}
+                onDrawUndo={onDrawUndo}
+                onStopDrawing={onStopDrawing}
+                onSaveDrawnWalk={onSaveDrawnWalk}
+              />
               <SavedRoutes
                 savedRoutes={savedRoutes}
                 activeRouteId={activeRouteId}
@@ -235,7 +276,6 @@ export default function SidePanel({
                 onLoadRoute={onLoadRoute}
                 onDeleteRoute={onDeleteRoute}
                 onRenameRoute={onRenameRoute}
-                onToggleWalked={onToggleRouteWalked}
                 onClearLoadedRoute={onClearLoadedRoute}
                 onRouteHover={onRouteHover}
                 collapsed={savedRoutesCollapsed}
@@ -278,6 +318,7 @@ export default function SidePanel({
                 drawMatchLoading={drawMatchLoading}
                 onSaveDrawnWalk={onSaveDrawnWalk}
                 onDrawUndo={onDrawUndo}
+                drawingForWalk={drawingForWalk}
               />
               <PathList
                 paths={paths}

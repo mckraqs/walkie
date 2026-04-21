@@ -150,17 +150,7 @@ export interface RouteListItem {
   total_distance: number;
   is_loop: boolean;
   is_custom: boolean;
-  walked: boolean;
   created_at: string;
-}
-
-export interface RouteWalkToggleResponse {
-  id: number;
-  walked: boolean;
-  walked_path_ids: number[];
-  partially_walked_path_ids: number[];
-  total_paths: number;
-  walked_count: number;
 }
 
 export interface SaveRouteRequest {
@@ -169,7 +159,6 @@ export interface SaveRouteRequest {
   total_distance: number;
   is_loop: boolean;
   is_custom?: boolean;
-  walked?: boolean;
   start_point: [number, number] | null;
   end_point: [number, number] | null;
   custom_geometry?: {
@@ -178,11 +167,38 @@ export interface SaveRouteRequest {
   } | null;
 }
 
-export interface SaveRouteResponse extends RouteListItem {
-  walked_path_ids?: number[];
-  partially_walked_path_ids?: number[];
-  total_paths?: number;
-  walked_count?: number;
+export interface SaveRouteResponse extends RouteListItem {}
+
+export interface WalkListItem {
+  id: number;
+  name: string;
+  walked_at: string;
+  distance: number;
+  created_at: string;
+}
+
+export interface WalkDetail extends WalkListItem {
+  geometry: {
+    type: "LineString";
+    coordinates: [number, number][];
+  };
+}
+
+export interface CreateWalkRequest {
+  name: string;
+  walked_at: string;
+  route_id?: number;
+  geometry?: {
+    type: "LineString";
+    coordinates: [number, number][];
+  };
+}
+
+export interface CreateWalkResponse extends WalkListItem {
+  walked_path_ids: number[];
+  partially_walked_path_ids: number[];
+  total_paths: number;
+  walked_count: number;
 }
 
 export interface RouteRenameRequest {

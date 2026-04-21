@@ -11,8 +11,8 @@ vi.mock("@/lib/gpx", () => ({
 describe("SavedRoutes", () => {
   const defaultProps = {
     savedRoutes: [
-      makeRouteListItem({ id: 1, name: "Morning Walk", total_distance: 3500, is_loop: true, walked: true }),
-      makeRouteListItem({ id: 2, name: "Evening Run", total_distance: 800, is_custom: true, walked: false }),
+      makeRouteListItem({ id: 1, name: "Morning Walk", total_distance: 3500, is_loop: true }),
+      makeRouteListItem({ id: 2, name: "Evening Run", total_distance: 800, is_custom: true }),
     ],
     activeRouteId: null as number | null,
     loadedRouteDetails: null as ReturnType<typeof makeRouteResponse> | null,
@@ -20,7 +20,6 @@ describe("SavedRoutes", () => {
     onLoadRoute: vi.fn(),
     onDeleteRoute: vi.fn<(routeId: number) => Promise<void>>().mockResolvedValue(undefined),
     onRenameRoute: vi.fn<(routeId: number, name: string) => Promise<void>>().mockResolvedValue(undefined),
-    onToggleWalked: vi.fn(),
     onClearLoadedRoute: vi.fn(),
     onRouteHover: vi.fn(),
     collapsed: false,
@@ -104,16 +103,6 @@ describe("SavedRoutes", () => {
     await user.click(screen.getByText("Delete"));
 
     expect(defaultProps.onDeleteRoute).toHaveBeenCalledWith(1);
-  });
-
-  it("toggles walked on checkbox click", async () => {
-    const user = userEvent.setup();
-    render(<SavedRoutes {...defaultProps} />);
-
-    const checkboxes = screen.getAllByRole("checkbox");
-    await user.click(checkboxes[0]);
-
-    expect(defaultProps.onToggleWalked).toHaveBeenCalledWith(1);
   });
 
   it("shows empty message when no routes", () => {

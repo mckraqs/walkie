@@ -91,7 +91,6 @@ export function makeRouteListItem(
     total_distance: 3000,
     is_loop: false,
     is_custom: false,
-    walked: false,
     created_at: "2024-01-01T00:00:00Z",
     ...overrides,
   };

@@ -35,7 +35,6 @@ from routes.services import (
     match_segments_to_geometry,
 )
 from users.models import FavoriteRegion
-from users.views import _get_walked_paths
 
 logger = logging.getLogger(__name__)
 
@@ -250,20 +249,12 @@ class RouteListCreateView(APIView):
             is_loop=serializer.validated_data["is_loop"],
             is_custom=is_custom,
             custom_geometry=custom_geom,
-            walked=serializer.validated_data["walked"],
             start_point=serializer.validated_data.get("start_point"),
             end_point=serializer.validated_data.get("end_point"),
         )
-        response_data = RouteListItemSerializer(route).data
-        if route.walked:
-            result = _get_walked_paths(request.user, region)
-            response_data["walked_path_ids"] = result.path_ids
-            response_data["partially_walked_path_ids"] = (
-                result.partially_walked_path_ids
-            )
-            response_data["total_paths"] = result.total_count
-            response_data["walked_count"] = result.walked_count
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return Response(
+            RouteListItemSerializer(route).data, status=status.HTTP_201_CREATED
+        )
 
 
 class RouteDetailView(APIView):
@@ -359,45 +350,6 @@ class RouteDetailView(APIView):
         route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
         route.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class RouteWalkToggleView(APIView):
-    """Toggle the walked status of a saved route."""
-
-    def post(self, request: Request, region_id: int, route_id: int) -> Response:
-        """Toggle walked on a saved route.
-
-        Args:
-            request: The authenticated HTTP request.
-            region_id: The region primary key.
-            route_id: The saved route primary key.
-
-        Returns:
-            200 with updated walked status, or 403/404.
-        """
-        region = get_object_or_404(Region, pk=region_id)
-        if not FavoriteRegion.objects.filter(user=request.user, region=region).exists():
-            return Response(
-                {"detail": "Access restricted to your favorite regions."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        route = get_object_or_404(Route, pk=route_id, user=request.user, region=region)
-        route.walked = not route.walked
-        route.save(update_fields=["walked"])
-
-        result = _get_walked_paths(request.user, region)
-
-        return Response(
-            {
-                "id": route.id,
-                "walked": route.walked,
-                "walked_path_ids": result.path_ids,
-                "partially_walked_path_ids": result.partially_walked_path_ids,
-                "total_paths": result.total_count,
-                "walked_count": result.walked_count,
-            }
-        )
 
 
 class MatchGeometryView(APIView):

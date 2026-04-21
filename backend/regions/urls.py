@@ -11,13 +11,13 @@ from routes.views import (
     RouteExportView,
     RouteGenerateView,
     RouteListCreateView,
-    RouteWalkToggleView,
 )
 from users.views import (
     FavoriteRegionListView,
     FavoriteRegionToggleView,
     WalkedPathsListView,
 )
+from walks.views import WalkDetailView, WalkListCreateView
 
 urlpatterns = [
     path("", RegionListView.as_view(), name="region-list"),
@@ -74,9 +74,14 @@ urlpatterns = [
         name="route-detail",
     ),
     path(
-        "<int:region_id>/routes/saved/<int:route_id>/walk/",
-        RouteWalkToggleView.as_view(),
-        name="route-walk-toggle",
+        "<int:region_id>/walks/",
+        WalkListCreateView.as_view(),
+        name="walk-list-create",
+    ),
+    path(
+        "<int:region_id>/walks/<int:walk_id>/",
+        WalkDetailView.as_view(),
+        name="walk-detail",
     ),
     path(
         "<int:region_id>/routes/saved/<int:route_id>/export/",

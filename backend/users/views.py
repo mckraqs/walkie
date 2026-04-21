@@ -172,10 +172,19 @@ class FavoriteRegionToggleView(APIView):
             places_deleted, _ = Place.objects.filter(
                 user=request.user, region=region
             ).delete()
+            from walks.models import Walk
+
+            walks_deleted, _ = Walk.objects.filter(
+                user=request.user, region=region
+            ).delete()
             favorite.delete()
 
         return Response(
-            {"routes_deleted": routes_deleted, "places_deleted": places_deleted},
+            {
+                "routes_deleted": routes_deleted,
+                "places_deleted": places_deleted,
+                "walks_deleted": walks_deleted,
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -236,10 +245,12 @@ def _get_walked_paths(user: object, region: Region) -> WalkedPathsResult:
     total_unnamed = Path.objects.filter(region=region, name="").count()
     total_count = total_unique_names + total_unnamed
 
-    walked_routes = Route.objects.filter(user=user, region=region, walked=True)
+    from walks.models import Walk
+
+    walks = Walk.objects.filter(user=user, region=region)
     walked_segment_ids: set[int] = set()
-    for route in walked_routes:
-        walked_segment_ids.update(route.segment_ids)
+    for walk in walks:
+        walked_segment_ids.update(walk.segment_ids)
 
     if not walked_segment_ids:
         return WalkedPathsResult(
