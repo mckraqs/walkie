@@ -23,7 +23,7 @@ from walks.serializers import (
     WalkCreateSerializer,
     WalkDetailSerializer,
     WalkListItemSerializer,
-    WalkRenameSerializer,
+    WalkUpdateSerializer,
 )
 
 
@@ -152,10 +152,10 @@ class WalkDetailView(APIView):
         return Response(WalkDetailSerializer(walk).data)
 
     def patch(self, request: Request, region_id: int, walk_id: int) -> Response:
-        """Rename a walk.
+        """Update a walk's name and/or date.
 
         Args:
-            request: The authenticated HTTP request with the new name.
+            request: The authenticated HTTP request with updated fields.
             region_id: The region primary key.
             walk_id: The walk primary key.
 
@@ -170,11 +170,17 @@ class WalkDetailView(APIView):
             )
 
         walk = get_object_or_404(Walk, pk=walk_id, user=request.user, region=region)
-        serializer = WalkRenameSerializer(data=request.data)
+        serializer = WalkUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        update_fields = ["name"]
         walk.name = serializer.validated_data["name"]
-        walk.save(update_fields=["name"])
+
+        if "walked_at" in serializer.validated_data:
+            walk.walked_at = serializer.validated_data["walked_at"]
+            update_fields.append("walked_at")
+
+        walk.save(update_fields=update_fields)
 
         return Response(WalkListItemSerializer(walk).data)
 

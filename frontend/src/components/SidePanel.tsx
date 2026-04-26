@@ -83,9 +83,10 @@ interface SidePanelProps {
   activeWalkId: number | null;
   onLoadWalk: (walkId: number) => void;
   onDeleteWalk: (walkId: number) => Promise<void>;
-  onRenameWalk: (walkId: number, name: string) => Promise<void>;
+  onUpdateWalk: (walkId: number, data: { name: string; walked_at: string }) => Promise<void>;
   onAddWalkFromRoute: (data: { route_id: number; name: string; walked_at: string }) => void;
   onAddWalkByDrawing: () => void;
+  onUploadGpx: (data: { name: string; walked_at: string; geometry: { type: "LineString"; coordinates: [number, number][] } }) => void;
   drawingForWalk: boolean;
   onClearActiveWalk: () => void;
 }
@@ -173,9 +174,10 @@ export default function SidePanel({
   activeWalkId,
   onLoadWalk,
   onDeleteWalk,
-  onRenameWalk,
+  onUpdateWalk,
   onAddWalkFromRoute,
   onAddWalkByDrawing,
+  onUploadGpx,
   drawingForWalk,
   onClearActiveWalk,
 }: SidePanelProps) {
@@ -262,9 +264,10 @@ export default function SidePanel({
                 activeWalkId={activeWalkId}
                 onLoadWalk={onLoadWalk}
                 onDeleteWalk={onDeleteWalk}
-                onRenameWalk={onRenameWalk}
+                onUpdateWalk={onUpdateWalk}
                 onAddWalkFromRoute={onAddWalkFromRoute}
                 onAddWalkByDrawing={onAddWalkByDrawing}
+                onUploadGpx={onUploadGpx}
                 collapsed={walkHistoryCollapsed}
                 onToggleCollapsed={() => {
                   const willCollapse = !walkHistoryCollapsed;

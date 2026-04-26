@@ -4,6 +4,9 @@ import {
   buildGpxString,
   buildKmlString,
   downloadRouteFile,
+  parseGpx,
+  douglasPeucker,
+  parseAndSimplifyGpx,
 } from "@/lib/gpx";
 import { makeRouteResponse } from "@/test/helpers";
 import type { SegmentFeature } from "@/types/geo";
@@ -303,5 +306,130 @@ describe("downloadRouteFile", () => {
     expect(capturedBlob).not.toBeNull();
     expect(capturedBlob!.type).toBe("application/vnd.google-earth.kml+xml");
     expect(mockAnchor.download).toBe("Test.kml");
+  });
+});
+
+describe("parseGpx", () => {
+  it("extracts coordinates from a minimal GPX", () => {
+    const gpx = `<?xml version="1.0"?>
+      <gpx xmlns="http://www.topografix.com/GPX/1/1">
+        <trk><trkseg>
+          <trkpt lat="52.0" lon="21.0"><ele>100</ele></trkpt>
+          <trkpt lat="52.1" lon="21.1"><ele>101</ele></trkpt>
+        </trkseg></trk>
+      </gpx>`;
+    const coords = parseGpx(gpx);
+    expect(coords).toEqual([
+      [21.0, 52.0],
+      [21.1, 52.1],
+    ]);
+  });
+
+  it("concatenates multiple tracks and segments", () => {
+    const gpx = `<?xml version="1.0"?>
+      <gpx xmlns="http://www.topografix.com/GPX/1/1">
+        <trk><trkseg>
+          <trkpt lat="52.0" lon="21.0"></trkpt>
+        </trkseg></trk>
+        <trk>
+          <trkseg><trkpt lat="52.1" lon="21.1"></trkpt></trkseg>
+          <trkseg><trkpt lat="52.2" lon="21.2"></trkpt></trkseg>
+        </trk>
+      </gpx>`;
+    const coords = parseGpx(gpx);
+    expect(coords).toHaveLength(3);
+    expect(coords[0]).toEqual([21.0, 52.0]);
+    expect(coords[1]).toEqual([21.1, 52.1]);
+    expect(coords[2]).toEqual([21.2, 52.2]);
+  });
+
+  it("throws on GPX with no trackpoints", () => {
+    const gpx = `<?xml version="1.0"?>
+      <gpx xmlns="http://www.topografix.com/GPX/1/1">
+        <trk><trkseg></trkseg></trk>
+      </gpx>`;
+    expect(() => parseGpx(gpx)).toThrow("No trackpoints found");
+  });
+
+  it("skips trackpoints with invalid coordinates", () => {
+    const gpx = `<?xml version="1.0"?>
+      <gpx xmlns="http://www.topografix.com/GPX/1/1">
+        <trk><trkseg>
+          <trkpt lat="bad" lon="21.0"></trkpt>
+          <trkpt lat="52.0" lon="21.0"></trkpt>
+        </trkseg></trk>
+      </gpx>`;
+    const coords = parseGpx(gpx);
+    expect(coords).toEqual([[21.0, 52.0]]);
+  });
+});
+
+describe("douglasPeucker", () => {
+  it("returns input unchanged when 2 or fewer points", () => {
+    const coords: [number, number][] = [[0, 0], [1, 1]];
+    expect(douglasPeucker(coords, 5)).toEqual(coords);
+  });
+
+  it("reduces collinear points to endpoints", () => {
+    // Points along a straight line (same longitude)
+    const coords: [number, number][] = [
+      [21.0, 52.0],
+      [21.0, 52.001],
+      [21.0, 52.002],
+      [21.0, 52.003],
+    ];
+    const result = douglasPeucker(coords, 5);
+    expect(result).toEqual([
+      [21.0, 52.0],
+      [21.0, 52.003],
+    ]);
+  });
+
+  it("preserves points on a curve that deviate beyond epsilon", () => {
+    // A point that deviates significantly from the line between start and end
+    const coords: [number, number][] = [
+      [21.0, 52.0],
+      [21.001, 52.0005], // slightly off the straight line
+      [21.0, 52.001],
+    ];
+    // With a very small epsilon, the middle point should be preserved
+    const result = douglasPeucker(coords, 0.1);
+    expect(result.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("simplifies when deviation is within epsilon", () => {
+    // Points very close to the line between start and end
+    const coords: [number, number][] = [
+      [21.0, 52.0],
+      [21.0000001, 52.0005],
+      [21.0, 52.001],
+    ];
+    // With large epsilon (100m), the middle point should be removed
+    const result = douglasPeucker(coords, 100);
+    expect(result).toEqual([
+      [21.0, 52.0],
+      [21.0, 52.001],
+    ]);
+  });
+});
+
+describe("parseAndSimplifyGpx", () => {
+  it("returns raw count, simplified count, and coordinates", () => {
+    const gpx = `<?xml version="1.0"?>
+      <gpx xmlns="http://www.topografix.com/GPX/1/1">
+        <trk><trkseg>
+          <trkpt lat="52.0" lon="21.0"></trkpt>
+          <trkpt lat="52.0001" lon="21.0"></trkpt>
+          <trkpt lat="52.0002" lon="21.0"></trkpt>
+          <trkpt lat="52.001" lon="21.0"></trkpt>
+        </trkseg></trk>
+      </gpx>`;
+    const result = parseAndSimplifyGpx(gpx);
+    expect(result.raw).toBe(4);
+    expect(result.simplified).toBeLessThanOrEqual(result.raw);
+    expect(result.coordinates.length).toBe(result.simplified);
+    // First and last point always preserved
+    expect(result.coordinates[0]).toEqual([21.0, 52.0]);
+    expect(result.coordinates[result.coordinates.length - 1]).toEqual([21.0, 52.001]);
   });
 });

@@ -69,7 +69,8 @@ class WalkDetailSerializer(serializers.ModelSerializer):
         return json.loads(obj.geometry.geojson)
 
 
-class WalkRenameSerializer(serializers.Serializer):
-    """Validate a walk rename request."""
+class WalkUpdateSerializer(serializers.Serializer):
+    """Validate a walk update request (name and/or date)."""
 
     name = serializers.CharField(max_length=255)
+    walked_at = serializers.DateField(required=False)

@@ -64,6 +64,7 @@ interface PathMapProps {
   onDrawVertex?: (coords: [number, number]) => void;
   drawMatchedSegments?: PathFeatureCollection | null;
   activeWalkGeometry?: { type: "LineString"; coordinates: [number, number][] } | null;
+  focusWalkKey?: number;
 }
 
 const PATH_DIMMED_STYLE: PathOptions = {
@@ -626,6 +627,26 @@ function FitToPath({
   return null;
 }
 
+function FitToWalk({
+  geometry,
+}: {
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const latLngs = geometry.coordinates.map(
+      ([lon, lat]) => [lat, lon] as [number, number],
+    );
+    const bounds = L.latLngBounds(latLngs);
+    if (bounds.isValid()) {
+      map.flyToBounds(bounds, { padding: [40, 40], maxZoom: 17, duration: 0.8 });
+    }
+  }, [map, geometry]);
+
+  return null;
+}
+
 function TooltipRepositioner({
   tooltipData,
   pathFeatureMap,
@@ -762,6 +783,7 @@ export default function PathMap({
   searchHighlight,
   focusPathId,
   focusPathKey,
+  focusWalkKey,
   hoveredRouteId,
   previewRoute,
   drawingWalk,
@@ -1304,12 +1326,15 @@ export default function PathMap({
           />
         )}
         {activeWalkGeometry && (
-          <Polyline
-            positions={activeWalkGeometry.coordinates.map(
-              ([lon, lat]) => [lat, lon] as [number, number]
-            )}
-            pathOptions={WALK_GEOMETRY_STYLE}
-          />
+          <>
+            <Polyline
+              positions={activeWalkGeometry.coordinates.map(
+                ([lon, lat]) => [lat, lon] as [number, number]
+              )}
+              pathOptions={WALK_GEOMETRY_STYLE}
+            />
+            <FitToWalk key={focusWalkKey} geometry={activeWalkGeometry} />
+          </>
         )}
         {composing && composedStartPoint && composedEndPoint && (
           <RouteMarkers route={{

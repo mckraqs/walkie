@@ -438,23 +438,23 @@ export async function deleteWalk(
   }
 }
 
-export async function renameWalk(
+export async function updateWalk(
   regionId: string,
   walkId: number,
-  name: string,
+  data: { name: string; walked_at?: string },
 ): Promise<WalkListItem> {
   const res = await fetch(
     `${API_URL}/api/regions/${regionId}/walks/${walkId}/`,
     {
       method: "PATCH",
       headers: authHeaders(),
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(data),
     },
   );
   handle401(res);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail ?? `Failed to rename walk: ${res.status}`);
+    throw new Error(body.detail ?? `Failed to update walk: ${res.status}`);
   }
   return res.json();
 }

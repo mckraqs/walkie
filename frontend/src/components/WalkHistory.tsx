@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Check, X, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { formatDistance } from "@/lib/geo";
 import CollapsibleSection from "@/components/collapsible-section";
 import AddWalkDialog from "@/components/AddWalkDialog";
+import UploadGpxDialog from "@/components/UploadGpxDialog";
+import EditWalkDialog from "@/components/EditWalkDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,9 +24,10 @@ interface WalkHistoryProps {
   activeWalkId: number | null;
   onLoadWalk: (walkId: number) => void;
   onDeleteWalk: (walkId: number) => Promise<void>;
-  onRenameWalk: (walkId: number, name: string) => Promise<void>;
+  onUpdateWalk: (walkId: number, data: { name: string; walked_at: string }) => Promise<void>;
   onAddWalkFromRoute: (data: { route_id: number; name: string; walked_at: string }) => void;
   onAddWalkByDrawing: () => void;
+  onUploadGpx: (data: { name: string; walked_at: string; geometry: { type: "LineString"; coordinates: [number, number][] } }) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   height: string;
@@ -53,9 +56,10 @@ export default function WalkHistory({
   activeWalkId,
   onLoadWalk,
   onDeleteWalk,
-  onRenameWalk,
+  onUpdateWalk,
   onAddWalkFromRoute,
   onAddWalkByDrawing,
+  onUploadGpx,
   collapsed,
   onToggleCollapsed,
   height,
@@ -67,46 +71,14 @@ export default function WalkHistory({
   onStopDrawing,
   onSaveDrawnWalk,
 }: WalkHistoryProps) {
-  const [renamingId, setRenamingId] = useState<number | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [renaming, setRenaming] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [gpxDialogOpen, setGpxDialogOpen] = useState(false);
+  const [editingWalk, setEditingWalk] = useState<WalkListItem | null>(null);
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [walkName, setWalkName] = useState("");
   const [walkDate, setWalkDate] = useState(todayString());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  function startRename(walk: WalkListItem) {
-    setRenamingId(walk.id);
-    setRenameValue(walk.name);
-  }
-
-  async function confirmRename() {
-    if (renamingId === null || !renameValue.trim()) return;
-    setRenaming(true);
-    try {
-      await onRenameWalk(renamingId, renameValue.trim());
-      setRenamingId(null);
-    } finally {
-      setRenaming(false);
-    }
-  }
-
-  function cancelRename() {
-    setRenamingId(null);
-    setRenameValue("");
-  }
-
-  async function handleDelete(walkId: number) {
-    setDeletingId(walkId);
-    try {
-      await onDeleteWalk(walkId);
-    } finally {
-      setDeletingId(null);
-    }
-  }
 
   return (
     <>
@@ -274,6 +246,9 @@ export default function WalkHistory({
                     <DropdownMenuItem onClick={onAddWalkByDrawing}>
                       Draw on Map
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setGpxDialogOpen(true)}>
+                      Upload GPX
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -286,10 +261,7 @@ export default function WalkHistory({
                   {walks.map((walk) => (
                     <div
                       key={walk.id}
-                      onClick={() => {
-                        if (renamingId === walk.id) return;
-                        onLoadWalk(walk.id);
-                      }}
+                      onClick={() => onLoadWalk(walk.id)}
                       className={`cursor-pointer rounded-md border px-2.5 py-2 text-sm transition-colors ${
                         activeWalkId === walk.id
                           ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/30"
@@ -297,70 +269,20 @@ export default function WalkHistory({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        {renamingId === walk.id ? (
-                          <div className="flex flex-1 items-center gap-1">
-                            <Input
-                              type="text"
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") confirmRename();
-                                if (e.key === "Escape") cancelRename();
-                              }}
-                              disabled={renaming}
-                              autoFocus
-                              className="min-w-0 flex-1 h-6 px-1.5 py-0.5 text-xs"
-                            />
-                            <button
-                              type="button"
-                              onClick={confirmRename}
-                              disabled={renaming || !renameValue.trim()}
-                              className="text-green-600 hover:text-green-700 disabled:opacity-50 dark:text-green-400"
-                              title="Confirm"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelRename}
-                              disabled={renaming}
-                              className="text-muted-foreground hover:text-foreground"
-                              title="Cancel"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
-                              {walk.name}
-                            </span>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
-                                  title="Actions"
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => startRename(walk)}>
-                                  Rename
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDelete(walk.id)}
-                                  disabled={deletingId === walk.id}
-                                  className="text-destructive"
-                                >
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </>
-                        )}
+                        <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
+                          {walk.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingWalk(walk);
+                          }}
+                          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                          title="Edit"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <span>{formatWalkDate(walk.walked_at)}</span>
@@ -383,6 +305,29 @@ export default function WalkHistory({
         onSubmit={(data) => {
           setAddDialogOpen(false);
           onAddWalkFromRoute(data);
+        }}
+      />
+      <UploadGpxDialog
+        open={gpxDialogOpen}
+        onClose={() => setGpxDialogOpen(false)}
+        onSubmit={(data) => {
+          setGpxDialogOpen(false);
+          onUploadGpx(data);
+        }}
+      />
+      <EditWalkDialog
+        open={editingWalk !== null}
+        walk={editingWalk}
+        onClose={() => setEditingWalk(null)}
+        onSubmit={async (data) => {
+          if (!editingWalk) return;
+          await onUpdateWalk(editingWalk.id, data);
+          setEditingWalk(null);
+        }}
+        onDelete={async () => {
+          if (!editingWalk) return;
+          await onDeleteWalk(editingWalk.id);
+          setEditingWalk(null);
         }}
       />
     </>

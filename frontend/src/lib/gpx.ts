@@ -96,6 +96,130 @@ export function buildKmlString(name: string, coordinates: Coord[]): string {
 </kml>`;
 }
 
+/**
+ * Parse a GPX XML string and extract [lon, lat] coordinates from all trackpoints.
+ * Concatenates all tracks and track segments into a single coordinate array.
+ */
+export function parseGpx(xmlString: string): Coord[] {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlString, "application/xml");
+
+  const parseError = doc.querySelector("parsererror");
+  if (parseError) {
+    throw new Error("Invalid GPX file: XML parsing failed.");
+  }
+
+  const coords: Coord[] = [];
+  const trkpts = doc.getElementsByTagName("trkpt");
+
+  for (let i = 0; i < trkpts.length; i++) {
+    const pt = trkpts[i];
+    const lat = parseFloat(pt.getAttribute("lat") ?? "");
+    const lon = parseFloat(pt.getAttribute("lon") ?? "");
+    if (!isNaN(lat) && !isNaN(lon)) {
+      coords.push([lon, lat]);
+    }
+  }
+
+  if (coords.length === 0) {
+    throw new Error("No trackpoints found in GPX file.");
+  }
+
+  return coords;
+}
+
+/**
+ * Compute perpendicular distance from a point to a line segment in approximate meters.
+ * Uses equirectangular approximation, accurate enough at walking-GPS scale.
+ */
+function perpendicularDistanceMeters(
+  point: Coord,
+  lineStart: Coord,
+  lineEnd: Coord,
+): number {
+  const DEG_TO_RAD = Math.PI / 180;
+  const EARTH_RADIUS = 6_371_000;
+  const midLat = ((lineStart[1] + lineEnd[1]) / 2) * DEG_TO_RAD;
+  const cosLat = Math.cos(midLat);
+
+  // Convert to approximate meters
+  const px = point[0] * cosLat * EARTH_RADIUS * DEG_TO_RAD;
+  const py = point[1] * EARTH_RADIUS * DEG_TO_RAD;
+  const ax = lineStart[0] * cosLat * EARTH_RADIUS * DEG_TO_RAD;
+  const ay = lineStart[1] * EARTH_RADIUS * DEG_TO_RAD;
+  const bx = lineEnd[0] * cosLat * EARTH_RADIUS * DEG_TO_RAD;
+  const by = lineEnd[1] * EARTH_RADIUS * DEG_TO_RAD;
+
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+
+  if (lenSq === 0) {
+    // lineStart and lineEnd are the same point
+    const ex = px - ax;
+    const ey = py - ay;
+    return Math.sqrt(ex * ex + ey * ey);
+  }
+
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  const projX = ax + t * dx;
+  const projY = ay + t * dy;
+  const ex = px - projX;
+  const ey = py - projY;
+  return Math.sqrt(ex * ex + ey * ey);
+}
+
+/**
+ * Douglas-Peucker line simplification.
+ * Reduces the number of points while preserving shape within the given epsilon (meters).
+ */
+export function douglasPeucker(coords: Coord[], epsilon: number): Coord[] {
+  if (coords.length <= 2) return coords;
+
+  let maxDist = 0;
+  let maxIdx = 0;
+
+  for (let i = 1; i < coords.length - 1; i++) {
+    const dist = perpendicularDistanceMeters(
+      coords[i],
+      coords[0],
+      coords[coords.length - 1],
+    );
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIdx = i;
+    }
+  }
+
+  if (maxDist > epsilon) {
+    const left = douglasPeucker(coords.slice(0, maxIdx + 1), epsilon);
+    const right = douglasPeucker(coords.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+
+  return [coords[0], coords[coords.length - 1]];
+}
+
+/** Default simplification tolerance in meters. */
+const DEFAULT_EPSILON_METERS = 5;
+
+/**
+ * Parse a GPX string and simplify the resulting coordinates using Douglas-Peucker.
+ * Returns raw count, simplified count, and the simplified coordinates.
+ */
+export function parseAndSimplifyGpx(
+  xmlString: string,
+  epsilonMeters: number = DEFAULT_EPSILON_METERS,
+): { raw: number; simplified: number; coordinates: Coord[] } {
+  const rawCoords = parseGpx(xmlString);
+  const simplified = douglasPeucker(rawCoords, epsilonMeters);
+  return {
+    raw: rawCoords.length,
+    simplified: simplified.length,
+    coordinates: simplified,
+  };
+}
+
 /** Generate and trigger download of a route file (GPX or KML). */
 export function downloadRouteFile(
   route: RouteResponse,

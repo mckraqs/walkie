@@ -15,7 +15,7 @@ import {
   createWalk,
   fetchWalk,
   deleteWalk as apiDeleteWalk,
-  renameWalk as apiRenameWalk,
+  updateWalk as apiUpdateWalk,
 } from "@/lib/api";
 import { getRouteEndpoints } from "@/lib/geo";
 import SidePanel from "@/components/SidePanel";
@@ -109,6 +109,7 @@ export default function RegionExplorer({
   const [activeWalkId, setActiveWalkId] = useState<number | null>(null);
   const [activeWalkGeometry, setActiveWalkGeometry] = useState<{ type: "LineString"; coordinates: [number, number][] } | null>(null);
   const [drawingForWalk, setDrawingForWalk] = useState(false);
+  const [focusWalkKey, setFocusWalkKey] = useState(0);
 
   // Route hover preview state
   const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
@@ -525,6 +526,7 @@ export default function RegionExplorer({
         const detail = await fetchWalk(regionId, walkId);
         setActiveWalkId(detail.id);
         setActiveWalkGeometry(detail.geometry);
+        setFocusWalkKey((k) => k + 1);
       } catch {
         showToast("Failed to load walk");
       }
@@ -554,9 +556,9 @@ export default function RegionExplorer({
     [regionId, activeWalkId, onWalkedChange],
   );
 
-  const handleRenameWalk = useCallback(
-    async (walkId: number, name: string) => {
-      const updated = await apiRenameWalk(regionId, walkId, name);
+  const handleUpdateWalk = useCallback(
+    async (walkId: number, data: { name: string; walked_at: string }) => {
+      const updated = await apiUpdateWalk(regionId, walkId, data);
       setWalks((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
     },
     [regionId],
@@ -583,6 +585,23 @@ export default function RegionExplorer({
     setActiveWalkId(null);
     setActiveWalkGeometry(null);
   }, []);
+
+  const handleUploadGpxWalk = useCallback(
+    async (data: { name: string; walked_at: string; geometry: { type: "LineString"; coordinates: [number, number][] } }) => {
+      try {
+        const result = await createWalk(regionId, {
+          name: data.name,
+          walked_at: data.walked_at,
+          geometry: data.geometry,
+        });
+        setWalks((prev) => [result, ...prev]);
+        onWalkedChange(result.walked_path_ids, result.partially_walked_path_ids, result.total_paths, result.walked_count);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Failed to create walk from GPX");
+      }
+    },
+    [regionId, onWalkedChange, showToast],
+  );
 
   const handleAddWalkByDrawing = useCallback(() => {
     setDrawingForWalk(true);
@@ -821,9 +840,10 @@ export default function RegionExplorer({
         activeWalkId={activeWalkId}
         onLoadWalk={handleLoadWalk}
         onDeleteWalk={handleDeleteWalk}
-        onRenameWalk={handleRenameWalk}
+        onUpdateWalk={handleUpdateWalk}
         onAddWalkFromRoute={handleAddWalkFromRoute}
         onAddWalkByDrawing={handleAddWalkByDrawing}
+        onUploadGpx={handleUploadGpxWalk}
         drawingForWalk={drawingForWalk}
         onClearActiveWalk={handleClearActiveWalk}
       />
@@ -865,6 +885,7 @@ export default function RegionExplorer({
         onDrawVertex={handleDrawVertex}
         drawMatchedSegments={drawMatchResult?.segments ?? null}
         activeWalkGeometry={activeWalkGeometry}
+        focusWalkKey={focusWalkKey}
       />
       {pendingPlaceLocation && (
         <PlaceNameDialog
