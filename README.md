@@ -27,7 +27,14 @@ datasets are uploaded.
 
 ![generate route](docs/assets/route_generation.png)
 
-... **and many more** - try it for youself!
+**Record walks and track coverage with Walk History**:
+
+- Add walks from saved routes, draw them on the map, or upload GPX files from GPS
+  devices (Apple Watch, Garmin, etc.)
+- Edit walk name and date, or delete walks from the edit dialog
+- See your walked street count and coverage percentage in the header
+
+... **and many more** - try it yourself!
 
 ## Tech Stack
 

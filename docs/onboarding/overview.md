@@ -16,7 +16,7 @@ cycling, driving, or performance athletics - it prioritizes walkability, accessi
 and leisurely pace.
 
 Walkie persists user data including favorite regions, saved routes, user-defined places,
-and a record of walked routes. This allows users to build a personal map of explored
+and a history of recorded walks. This allows users to build a personal map of explored
 areas and revisit favorite routes.
 
 ## Architecture Overview
@@ -115,8 +115,11 @@ has source and target topology nodes. Segments form the graph that pgRouting ope
 to compute shortest paths.
 
 **Route**: A saved walking route with an ordered list of segment IDs, distance metadata,
-loop status, and walked status. Routes are what users generate, save, name, export, and
-mark as completed.
+and loop status. Routes are what users generate, save, name, and export.
+
+**Walk**: A record of a completed walk, with its own geometry, walked date, and
+distance. Walks are independent from routes and are the primary mechanism for tracking
+walking progress. Created via GPX upload, drawing on the map, or from a saved route.
 
 **Place**: A user-defined named location (point) within a region. Places serve as
 optional start or end points for route generation, allowing users to save favorite

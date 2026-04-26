@@ -58,12 +58,17 @@ RootLayout
           RegionExplorer (authenticated)
             SidePanel
               Places (embeds PlaceSearch)
+              WalkHistory
               SavedRoutes
               RoutePlanner
               PathList
             PathMap (dynamic import, SSR disabled)
-              PlaceNameDialog
-              ConfirmDialog
+              FitToWalk
+            PlaceNameDialog
+            ConfirmDialog
+            AddWalkDialog
+            EditWalkDialog
+            UploadGpxDialog
 ```
 
 ### Component Descriptions
@@ -100,8 +105,25 @@ mode, shows the generation form (distance, route type, start/end points) and a "
 Composing" button. In composing mode, shows segment stats, undo/clear controls, and
 save flow. In results mode, shows generated route details with save/download/clear.
 
-**SavedRoutes** List of user-saved routes with options to load, rename, mark as walked,
-delete, and export.
+**SavedRoutes** List of user-saved routes with options to load, rename, delete, and
+export as GPX or KML.
+
+**WalkHistory** List of recorded walks showing name, date, and distance. Each walk has
+an edit button opening a dialog for name/date changes or deletion. The "+ Add Walk"
+dropdown offers three creation flows: from saved route, draw on map, or upload GPX.
+
+**AddWalkDialog** Modal dialog for creating a walk from a saved route. Select a route,
+provide a name and date.
+
+**EditWalkDialog** Modal dialog for editing a walk's name and date, with a delete
+button.
+
+**UploadGpxDialog** Modal dialog for creating a walk from a GPX file. Parses the file
+client-side with Douglas-Peucker simplification, shows a point count confirmation line,
+and collects name and date.
+
+**FitToWalk** Internal PathMap component that zooms the map to fit the selected walk's
+geometry using animated flyToBounds.
 
 **Places** List of saved places with options to create (pin on map or search), rename,
 delete, and use as route endpoints. Embeds `PlaceSearch` inline when search mode is
@@ -161,6 +183,11 @@ Lifted from RegionExplorer and distributed to SidePanel and PathMap:
 - `selectedSegments` - set of selected segment IDs in compose mode
 - `pointPickingMode` - 'start' | 'end' | null for route generation
 - `loading` - boolean indicating if data is loading
+- `walks` - array of recorded walks
+- `activeWalkId` - currently selected walk ID
+- `activeWalkGeometry` - geometry of the selected walk for map display
+- `drawingForWalk` - boolean indicating if drawing mode is for a walk
+- `focusWalkKey` - counter that triggers map zoom to selected walk
 
 ## API Client (`src/lib/api.ts`)
 
@@ -193,9 +220,18 @@ response parsing.
 
 - `GET /api/regions/{region_id}/routes/saved/` - lists saved routes in region
 - `POST /api/regions/{region_id}/routes/saved/` - creates new route
-- `PATCH /api/regions/{region_id}/routes/saved/{route_id}/` - updates route name or
-  walked status
+- `PATCH /api/regions/{region_id}/routes/saved/{route_id}/` - renames route
 - `DELETE /api/regions/{region_id}/routes/saved/{route_id}/` - deletes route
+- `POST /api/regions/{region_id}/routes/match-geometry/` - matches drawn geometry to
+  segments
+
+**Walks:**
+
+- `GET /api/regions/{region_id}/walks/` - lists walks in region
+- `POST /api/regions/{region_id}/walks/` - creates walk from route ID or geometry
+- `GET /api/regions/{region_id}/walks/{walk_id}/` - retrieves walk with geometry
+- `PATCH /api/regions/{region_id}/walks/{walk_id}/` - updates walk name and/or date
+- `DELETE /api/regions/{region_id}/walks/{walk_id}/` - deletes walk
 
 **Paths:**
 
@@ -240,6 +276,12 @@ segments (edges between intersections) with distinct styling.
 **Places:** Marker layer showing saved places. Each marker includes a popup with place
 name and options.
 
+**Walk geometry:** Polyline displaying the selected walk's path when a walk is active in
+Walk History. Styled distinctly from routes.
+
+**Drawn walk/route:** Polyline showing vertices placed by the user in draw mode, with
+matched segments highlighted.
+
 **Temporary points:** Markers for points being picked for route start/end or place
 creation.
 
@@ -256,6 +298,10 @@ confirmation before adding.
 (start or end point) captures coordinates and displays options to use once or save as
 place.
 
+**Walk/route drawing:** In draw mode, clicking the map places vertices that form
+a LineString. The geometry is sent to the match-geometry endpoint (debounced) to show
+matched segments and distance in real time.
+
 ## Utility Modules
 
 ### `src/lib/geo.ts`
@@ -264,37 +310,36 @@ Geographic calculations and transformations.
 
 **Functions:**
 
-`formatDistance(meters: number): string` Converts meters to human-readable format
-(kilometers or meters with appropriate precision).
-
-`haversineDistance(coord1: [number, number], coord2: [number, number]): number`
-Calculates great-circle distance between two coordinates in meters using the Haversine
-formula.
-
-`getRouteEndpoints(route: GeoJSON): [number, number][]` Returns start and end
-coordinates of a route linestring.
-
-`getEndpointCoords(segments: Segment[], direction: 'start' | 'end'): [number, number]`
-Traverses a chain of connected segments to find the endpoint in a given direction.
+- **formatDistance** -- formats a distance in meters as a human-readable string (km or
+  m)
+- **haversineDistance** -- computes great-circle distance between two [lon, lat] points
+  in meters
+- **getRouteEndpoints** -- traces a chain of segment IDs to determine the start and end
+  topology nodes
+- **getEndpointCoords** -- extracts the geographic [lon, lat] coordinates of a segment
+  chain's start and end points
 
 ### `src/lib/gpx.ts`
 
-GPX and KML file generation for route export.
+GPX/KML export and GPX import utilities.
 
-**Functions:**
+**Export functions:**
 
-`stitchCoordinates(segments: Segment[]): number[][]` Merges coordinates from connected
-segments into a continuous array, handling direction reversals.
+- **stitchCoordinates** -- merges ordered GeoJSON LineString features into a single
+  coordinate array, handling segment reversal and junction point deduplication
+- **buildGpxString** -- generates GPX 1.1 XML from a route name and coordinates
+- **buildKmlString** -- generates KML 2.2 XML from a route name and coordinates
+- **downloadRouteFile** -- stitches route segments, builds GPX or KML content, and
+  triggers a browser file download
 
-`generateGPX(route: GeoJSON, metadata?: RouteMetadata): string` Generates GPX 1.1 XML
-document from route geometry. Includes optional route name, description, and waypoint
-data.
+**Import functions (used by GPX upload):**
 
-`generateKML(route: GeoJSON, metadata?: RouteMetadata): string` Generates KML 2.2 XML
-document from route geometry for Google Earth compatibility.
-
-`downloadRouteFile(content: string, filename: string, mimeType: string): void` Triggers
-browser download of generated file (GPX or KML).
+- **parseGpx** -- parses GPX XML via DOMParser, extracts [lon, lat] coordinates from all
+  trackpoints across all tracks and track segments
+- **douglasPeucker** -- Douglas-Peucker line simplification using perpendicular distance
+  in approximate meters
+- **parseAndSimplifyGpx** -- combines parsing and simplification, returns raw point
+  count, simplified count, and the resulting coordinates
 
 ## UI Component Library
 
@@ -318,6 +363,8 @@ different features:
 
 - **Places** - manage saved places with integrated search (pin on map or search for
   addresses)
+- **Walk History** - view, add, edit, and delete recorded walks; add walks from saved
+  routes, by drawing on the map, or by uploading GPX files
 - **Saved Routes** - view, manage, and export saved routes
 - **Route Planner** - generate walking routes or manually compose routes by selecting
   segments (switches between generation form, composing mode, and results mode)

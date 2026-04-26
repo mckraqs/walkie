@@ -89,12 +89,32 @@ A user-saved walking route within a region.
 | `total_distance` | `FloatField`                           | Route distance in meters                                  |
 | `is_loop`        | `BooleanField`                         | Whether the route is a loop (default `False`)             |
 | `is_custom`      | `BooleanField`                         | Whether the route was manually composed (default `False`) |
-| `walked`         | `BooleanField`                         | Whether the user has walked this route (default `False`)  |
+| `custom_geometry`| `LineStringField(null)`                | Optional hand-drawn route geometry (SRID 4326)            |
 | `start_point`    | `ArrayField(FloatField, size=2, null)` | Start coordinates `[lon, lat]`                            |
 | `end_point`      | `ArrayField(FloatField, size=2, null)` | End coordinates `[lon, lat]`                              |
 | `created_at`     | `DateTimeField`                        | Auto-set on creation                                      |
 
 **Indexes:** `(user, region)` **Ordering:** `-created_at`
+
+## Walk
+
+A recorded walk with its own geometry, independent from routes. Walks are the sole
+source of truth for region walk coverage.
+
+**App:** `walks`
+
+| Field          | Type                       | Description                                     |
+| -------------- | -------------------------- | ----------------------------------------------- |
+| `user`         | `ForeignKey(User)`         | Walk owner (`CASCADE` on delete)                |
+| `region`       | `ForeignKey(Region)`       | Parent region (`CASCADE` on delete)             |
+| `name`         | `CharField(255)`           | Walk display name                               |
+| `geometry`     | `LineStringField`          | Walk geometry (SRID 4326)                       |
+| `segment_ids`  | `ArrayField(IntegerField)` | Matched segment IDs (computed at creation time) |
+| `walked_at`    | `DateField`                | Date the walk was taken                         |
+| `distance`     | `FloatField`               | Walk distance in meters                         |
+| `created_at`   | `DateTimeField`            | Auto-set on creation                            |
+
+**Indexes:** `(user, region)`, `walked_at` **Ordering:** `-walked_at`, `-created_at`
 
 ## Place
 

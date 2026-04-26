@@ -145,18 +145,36 @@ XML format (application/gpx+xml) with the following structure:
 <gpx version="1.1">
   <trk>
     <trkseg>
-      <trkpt lat="..." lon="...">
-        <ele>...</ele>
-        <time>...</time>
-      </trkpt>
+      <trkpt lat="..." lon="..."/>
       ...
     </trkseg>
   </trk>
 </gpx>
 ```
 
-Latitude/longitude attributes use decimal degrees (WGS84). Elevation is set to 0 if not
-available.
+Latitude/longitude attributes use decimal degrees (WGS84).
+
+## Segment Matching
+
+The `match_segments_to_geometry` function snaps a user-drawn or GPX-imported LineString
+to the nearest street segments in a region. This is used when creating walks from drawn
+geometry or uploaded GPX files.
+
+**Algorithm:**
+
+1. Buffer the input LineString by `MATCH_BUFFER_M` (15 meters) in a projected CRS
+   (SRID 2180) for accurate meter-based calculations
+2. Find all segments whose geometry intersects the buffer
+3. For each candidate segment, compute the fraction of its length that overlaps with the
+   buffer
+4. Keep segments where the overlap fraction exceeds `MATCH_OVERLAP_THRESHOLD` (0.75)
+5. Return the matched segment IDs, total matched distance, and unique street names
+
+| Constant                  | Value | Description                                      |
+| ------------------------- | ----- | ------------------------------------------------ |
+| `MATCH_BUFFER_M`          | 15    | Buffer radius (m) around the input geometry      |
+| `MATCH_OVERLAP_THRESHOLD` | 0.75  | Min fraction of segment length that must overlap |
+| `MATCH_SRID`              | 2180  | Projected CRS for accurate distance calculations |
 
 ## Constants
 

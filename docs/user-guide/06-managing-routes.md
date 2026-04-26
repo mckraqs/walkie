@@ -14,10 +14,11 @@ geometry.
 
 Click the edit icon next to a route's name, type a new name, and confirm.
 
-## Marking a Route as Walked
+## Tracking Walked Routes
 
-Click the walk toggle on a saved route to mark it as walked (or unmark it). Walked
-routes contribute to your coverage counter in the header.
+To record that you've walked a route, use the Walk History system. See
+[Tracking Progress](07-tracking-progress.md) for details on adding walks from saved
+routes, drawing on the map, or uploading GPX files.
 
 ## Deleting a Route
 

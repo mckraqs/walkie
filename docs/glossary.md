@@ -57,9 +57,9 @@ scope - users favorite regions to access all features within them.
 ## Route
 
 A saved walking route consisting of an ordered list of segment IDs, with metadata like
-distance, loop status, and walked status. Routes encapsulate the complete path from
+distance, loop status, and custom geometry. Routes encapsulate the complete path from
 start to end, including all geometry and properties. Users can save, name, rename,
-delete, mark as walked, and export routes.
+delete, and export routes. Routes are plans; walks track completion.
 
 ## Segment
 
@@ -75,9 +75,16 @@ gets source and target node IDs used for shortest-path routing. Topology transfo
 a collection of segments into a directed, weighted graph where Dijkstra's algorithm can
 compute optimal routes.
 
-## Walked Status
+## Walk
 
-A boolean flag on a saved route indicating the user has physically walked it. Walked
-routes contribute to the coverage counter, allowing users to track how much of a region
-they have explored. A user can toggle a route's walked status from the saved routes
-list.
+A record of a completed walk with its own geometry, walked date, distance, and matched
+segment references. Walks are independent from routes and are the primary mechanism for
+tracking walking progress. Created by uploading a GPX file, drawing on the map, or
+selecting an existing saved route.
+
+## Walk Coverage
+
+The proportion of a region's streets that a user has walked. Coverage is derived from
+Walk records: each walk's geometry is matched to street segments, and a street counts as
+walked when 50% or more of its segments are covered. Named streets are evaluated by name
+(all segments sharing a name are grouped); unnamed paths are evaluated individually.

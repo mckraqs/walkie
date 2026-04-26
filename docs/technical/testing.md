@@ -32,9 +32,14 @@ Use these fixtures in your test functions to avoid repeated setup and teardown l
 
 The following test files are included in the project:
 
-- `backend/users/tests/test_users.py` - User authentication and account tests
-- `backend/users/tests/test_walked_paths.py` - Walked route tracking tests
 - `backend/test_migrations.py` - Database migration tests
+- `backend/regions/tests.py` - Region listing and detail tests
+- `backend/paths/tests.py` - Path and segment listing tests
+- `backend/places/tests.py` - Place CRUD tests
+- `backend/routes/tests.py` - Route generation, saving, and management tests
+- `backend/walks/tests.py` - Walk creation, update, deletion, and progress tests
+- `backend/users/tests/test_users.py` - User authentication and account tests
+- `backend/users/tests/test_walked_paths.py` - Walk coverage computation tests
 
 Each Django app should have a `tests/` subdirectory with a corresponding test module for
 each major feature.
@@ -122,6 +127,7 @@ Component tests in `frontend/src/components/__tests__/`:
 - `Select.test.tsx`
 - `SidePanel.test.ts`
 - `Toast.test.tsx`
+- `UploadGpxDialog.test.tsx`
 
 Library tests in `frontend/src/lib/__tests__/`:
 
